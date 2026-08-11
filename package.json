@@ -1,6 +1,6 @@
 {
   "name": "ferez-plataforma",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Plataforma digital de Gasolineras Ferez",
   "engines": { "node": ">=20" },
