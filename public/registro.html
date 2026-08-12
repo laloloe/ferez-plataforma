@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro — Gasolineras Ferez</title>
+<meta name="description" content="Regístrate para participar en el sorteo de Gasolineras Ferez.">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --verde:#20C800; --verde-prof:#18A000; --negro:#000000; --blanco:#FFFFFF;
+  --gris:#53565A; --papel:#F2F4F1; --linea:#E3E7E1; --linea-osc:#1E221C;
+  --gris-claro:#C9CEC6; --tinta:#2C2F2B;
+  --display:'Archivo Black',system-ui,sans-serif;
+  --body:'Barlow',Arial,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--body);background:var(--negro);color:var(--blanco);font-size:17px;line-height:1.65;min-height:100vh;display:flex;flex-direction:column}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--verde-prof);outline-offset:3px;border-radius:2px}
+.nav{background:var(--negro);border-bottom:1px solid var(--linea-osc)}
+.nav .wrap{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;align-items:center;height:64px}
+.brand{font-family:var(--display);font-size:19px;letter-spacing:.06em;color:var(--blanco);text-decoration:none}
+main{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:48px 24px}
+.tarjeta{width:100%;max-width:480px;background:var(--papel);color:var(--negro);border-radius:14px;padding:36px 32px;border-top:6px solid var(--verde)}
+h1{font-family:var(--display);font-weight:400;font-size:28px;line-height:1.2;margin-bottom:8px}
+.sub{color:var(--tinta);font-size:16px;margin-bottom:26px}
+label{display:block;font-weight:600;font-size:15px;margin:18px 0 6px}
+input[type=text],input[type=tel]{width:100%;padding:12px 14px;font-family:var(--body);font-size:17px;border:1.5px solid var(--linea);border-radius:8px;background:var(--blanco)}
+input:focus{border-color:var(--verde-prof)}
+.aviso{display:flex;gap:10px;align-items:flex-start;margin:22px 0;font-size:15px;color:var(--tinta)}
+.aviso input{margin-top:5px;width:18px;height:18px;accent-color:var(--verde-prof)}
+button{width:100%;background:var(--verde);color:var(--negro);font-weight:700;font-size:16px;font-family:var(--body);padding:14px;border:2px solid var(--verde);border-radius:8px;cursor:pointer;transition:background .15s ease}
+button:hover{background:#2ADF06}
+button:disabled{opacity:.6;cursor:wait}
+.msj{margin-top:18px;padding:13px 15px;border-radius:8px;font-size:15px;display:none}
+.msj.ok{display:block;background:#E4F8DE;border:1.5px solid var(--verde-prof);color:#0E5A00}
+.msj.error{display:block;background:#FBE9E7;border:1.5px solid #C62828;color:#8E1B12}
+.pie{text-align:center;padding:22px;color:var(--gris);font-size:14px}
+.pie a{color:var(--gris-claro)}
+</style>
+</head>
+<body>
+<header class="nav"><div class="wrap"><a class="brand" href="/">GASOLINERAS FEREZ</a></div></header>
+<main>
+  <form class="tarjeta" id="forma" novalidate>
+    <h1>Regístrate para participar</h1>
+    <p class="sub">Con tu registro podrás recibir boletos del sorteo enviando por WhatsApp el folio de tu ticket de carga.</p>
+
+    <label for="nombre">Nombre completo</label>
+    <input type="text" id="nombre" name="nombre" autocomplete="name" required maxlength="150">
+
+    <label for="telefono">Teléfono celular (10 dígitos)</label>
+    <input type="tel" id="telefono" name="telefono" autocomplete="tel" inputmode="numeric" placeholder="625 123 4567" required>
+
+    <div class="aviso">
+      <input type="checkbox" id="acepto" name="acepto_aviso" required>
+      <label for="acepto" style="margin:0;font-weight:400">He leído y acepto el <a href="/aviso-privacidad" target="_blank" rel="noopener">aviso de privacidad</a>.</label>
+    </div>
+
+    <button type="submit" id="boton">Registrarme</button>
+    <p class="msj" id="mensaje" role="status"></p>
+  </form>
+</main>
+<footer class="pie">Estación de Servicio Ferez, S.A. de C.V. · <a href="/aviso-privacidad">Aviso de privacidad</a></footer>
+<script>
+const forma = document.getElementById('forma');
+const mensaje = document.getElementById('mensaje');
+const boton = document.getElementById('boton');
+forma.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mensaje.className = 'msj';
+  boton.disabled = true;
+  try {
+    const respuesta = await fetch('/api/registro', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: document.getElementById('nombre').value,
+        telefono: document.getElementById('telefono').value,
+        acepto_aviso: document.getElementById('acepto').checked
+      })
+    });
+    const datos = await respuesta.json();
+    mensaje.textContent = datos.mensaje;
+    mensaje.className = 'msj ' + (datos.ok ? 'ok' : 'error');
+    if (datos.ok) forma.reset();
+  } catch {
+    mensaje.textContent = 'No hay conexión. Intenta de nuevo.';
+    mensaje.className = 'msj error';
+  } finally {
+    boton.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
