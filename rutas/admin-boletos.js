@@ -185,6 +185,41 @@ router.get('/boletos/detalle', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Bitácora consultable: cada emisión, rechazo y anulación (ORDEN 2, remate).
+router.get('/bitacora', async (req, res, next) => {
+  try {
+    const condiciones = [];
+    const parametros = [];
+    if (req.query.tipo) { condiciones.push('tipo = ?'); parametros.push(req.query.tipo); }
+    if (req.query.resultado) { condiciones.push('resultado = ?'); parametros.push(req.query.resultado); }
+    const filasBD = await consultar(
+      `SELECT fecha, actor, tipo, telefono, folio_venta, resultado, detalle, boletos_generados
+       FROM bitacora_boletos ${condiciones.length ? 'WHERE ' + condiciones.join(' AND ') : ''}
+       ORDER BY id DESC LIMIT 200`, parametros);
+    const resultados = await consultar('SELECT DISTINCT resultado FROM bitacora_boletos ORDER BY resultado');
+    const opciones = resultados.map((r) =>
+      `<option value="${escaparHTML(r.resultado)}" ${req.query.resultado === r.resultado ? 'selected' : ''}>${escaparHTML(r.resultado)}</option>`).join('');
+    const filas = filasBD.map((f) => `<tr>
+      <td>${formatearFecha(f.fecha)}</td><td>${escaparHTML(f.actor)}</td><td>${escaparHTML(f.tipo)}</td>
+      <td>${escaparHTML(f.telefono ?? '—')}</td><td>${escaparHTML(f.folio_venta ?? '—')}</td>
+      <td>${escaparHTML(f.resultado)}</td><td>${f.boletos_generados}</td>
+      <td style="white-space:normal">${escaparHTML(f.detalle ?? '')}</td></tr>`).join('');
+    res.send(paginaAdmin('Bitácora', `
+      <h1>Bitácora del motor</h1>
+      <form class="linea" method="get" action="/admin/bitacora">
+        <div><label>Tipo</label><select name="tipo"><option value="">Todos</option>
+          <option value="reclamo" ${req.query.tipo === 'reclamo' ? 'selected' : ''}>Reclamo</option>
+          <option value="compra" ${req.query.tipo === 'compra' ? 'selected' : ''}>Compra</option>
+          <option value="anulacion" ${req.query.tipo === 'anulacion' ? 'selected' : ''}>Anulación</option></select></div>
+        <div><label>Resultado</label><select name="resultado"><option value="">Todos</option>${opciones}</select></div>
+        <button type="submit">Filtrar</button>
+      </form>
+      ${filas
+        ? `<table><tr><th>Fecha</th><th>Actor</th><th>Tipo</th><th>Teléfono</th><th>Folio</th><th>Resultado</th><th>Boletos</th><th>Detalle</th></tr>${filas}</table>`
+        : '<p class="vacio">Sin movimientos con esos filtros.</p>'}`));
+  } catch (err) { next(err); }
+});
+
 router.post('/boletos/anular', async (req, res, next) => {
   try {
     const resultado = await motor.anularBoleto({

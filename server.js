@@ -40,6 +40,7 @@ app.post('/api/facturacion', (req, res) => {
 });
 
 app.use(rutaRegistro);
+app.use(require('./rutas/padron'));
 app.use('/admin', rutaAdmin);
 
 // Cualquier otra ruta devuelve la landing

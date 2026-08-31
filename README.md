@@ -43,9 +43,11 @@ Sin base de datos configurada el sitio sigue funcionando; registro y panel respo
 - `/` — landing
 - `/registro` — alta de participantes (nombre, teléfono E.164, aceptación del aviso)
 - `/aviso-privacidad` — aviso de privacidad (LFPDPPP)
+- `/boletos` — padrón público: contador, buscador (boleto o teléfono) y lista completa paginada
 - `/admin` — panel: resumen, participantes, importación de ventas por CSV
 - `/admin/boletos` — reclamo manual de folios, boletos de oficina, listado con filtros y detalle
 - `/admin/parametros` — parámetros del sorteo (tabla `configuracion`) editables con validación
+- `/admin/bitacora` — bitácora consultable del motor (emisiones, rechazos, anulaciones)
 - `/salud` — estado del servicio
 
 ## Importación de ventas (CSV)
@@ -69,4 +71,4 @@ editables desde `/admin/parametros`, y bitácora en `bitacora_boletos`.
 ## Pendientes (ver SPEC sección 11)
 
 - Integración con ControlGAS (ATIO) — implementar `FuenteControlGAS`
-- Webhook de WhatsApp, padrón público y sellado (pasos 6-8 de la sección 12)
+- Webhook de WhatsApp y sellado del padrón (pasos 6 y 8 de la sección 12)

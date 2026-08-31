@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "migrar": "node lib/migraciones.js",
-    "test": "node --test pruebas/*.test.js"
+    "test": "node --test --test-concurrency=1 pruebas/*.test.js"
   },
   "dependencies": {
     "csv-parse": "^7.0.2",
