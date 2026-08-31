@@ -9,6 +9,12 @@ npm install
 npm start
 ```
 
+Pruebas (las de motor requieren una base MySQL de prueba en las variables `DB_*`):
+
+```bash
+npm test
+```
+
 Abre http://localhost:3000
 
 ## Estructura
@@ -38,6 +44,8 @@ Sin base de datos configurada el sitio sigue funcionando; registro y panel respo
 - `/registro` — alta de participantes (nombre, teléfono E.164, aceptación del aviso)
 - `/aviso-privacidad` — aviso de privacidad (LFPDPPP)
 - `/admin` — panel: resumen, participantes, importación de ventas por CSV
+- `/admin/boletos` — reclamo manual de folios, boletos de oficina, listado con filtros y detalle
+- `/admin/parametros` — parámetros del sorteo (tabla `configuracion`) editables con validación
 - `/salud` — estado del servicio
 
 ## Importación de ventas (CSV)
@@ -51,8 +59,14 @@ Duplicados (mismo folio y estación) se omiten automáticamente.
 
 Automático en Railway con cada push a `main`. Las migraciones se aplican al arrancar.
 
+## Módulo de sorteo
+
+El SPEC vive en `specs/SPEC-SORTEO-Ferez.md` (v0.2, EN EJECUCIÓN). El motor de
+boletos (`servicios/`) emite por reclamo de folio o compra en oficina, con
+numeración global `SF27-######` sin huecos, parámetros en `configuracion`
+editables desde `/admin/parametros`, y bitácora en `bitacora_boletos`.
+
 ## Pendientes (ver SPEC sección 11)
 
-- Mecánica del sorteo (reglas parametrizables en la tabla `configuracion`)
 - Integración con ControlGAS (ATIO) — implementar `FuenteControlGAS`
-- Motor de boletos, webhook de WhatsApp, padrón público y sellado
+- Webhook de WhatsApp, padrón público y sellado (pasos 6-8 de la sección 12)

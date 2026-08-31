@@ -1,7 +1,7 @@
 // FuenteManual: ventas cargadas por archivo CSV desde el panel (SPEC sección 6.1).
 //
 // Formato esperado del CSV (encabezados flexibles, sin distinguir mayúsculas):
-//   folio, fecha_hora (o fecha), producto, litros, importe (o monto/total)
+//   folio, fecha_hora (o fecha), producto, litros, importe (o monto/total), forma_pago
 // Separador: coma o punto y coma. Fechas aceptadas:
 //   AAAA-MM-DD [HH:MM[:SS]]  o  DD/MM/AAAA [HH:MM[:SS]]
 
@@ -14,6 +14,7 @@ const ALIAS_COLUMNAS = {
   producto: ['producto', 'combustible', 'articulo'],
   litros: ['litros', 'volumen', 'cantidad'],
   importe: ['importe', 'monto', 'total'],
+  forma_pago: ['forma_pago', 'forma de pago', 'pago', 'metodo_pago', 'método de pago'],
 };
 
 function normalizarEncabezado(texto) {
@@ -116,6 +117,7 @@ class FuenteManual extends FuenteDeVentas {
         producto: mapa.producto !== undefined ? String(fila[mapa.producto] ?? '').trim() || null : null,
         litros: mapa.litros !== undefined ? interpretarNumero(fila[mapa.litros]) : null,
         importe: mapa.importe !== undefined ? interpretarNumero(fila[mapa.importe]) : null,
+        forma_pago: mapa.forma_pago !== undefined ? String(fila[mapa.forma_pago] ?? '').trim() || null : null,
       });
     }
     return { ventas, errores };

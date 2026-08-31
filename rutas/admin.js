@@ -30,7 +30,10 @@ router.use((req, res, next) => {
   const cabecera = req.headers.authorization || '';
   if (cabecera.startsWith('Basic ')) {
     const [u, ...resto] = Buffer.from(cabecera.slice(6), 'base64').toString('utf8').split(':');
-    if (comparaSegura(u, usuario) && comparaSegura(resto.join(':'), password)) return next();
+    if (comparaSegura(u, usuario) && comparaSegura(resto.join(':'), password)) {
+      req.actor = u;
+      return next();
+    }
   }
   res.set('WWW-Authenticate', 'Basic realm="Panel Ferez", charset="UTF-8"');
   return res.status(401).send('Se requiere autenticación.');
@@ -117,7 +120,7 @@ async function paginaVentas(res, avisoHTML = '') {
     <h1>Ventas</h1>
     ${avisoHTML}
     <h2>Importar ventas (CSV)</h2>
-    <p>Columnas requeridas: <code>folio</code> y <code>fecha_hora</code> (o <code>fecha</code>). Opcionales: <code>producto</code>, <code>litros</code>, <code>importe</code>. Un archivo por estación.</p>
+    <p>Columnas requeridas: <code>folio</code> y <code>fecha_hora</code> (o <code>fecha</code>). Opcionales: <code>producto</code>, <code>litros</code>, <code>importe</code>, <code>forma_pago</code>. Un archivo por estación.</p>
     <form class="linea" method="post" action="/admin/ventas/importar" enctype="multipart/form-data">
       <div><label for="estacion_id">Estación</label>
       <select id="estacion_id" name="estacion_id" required>${opciones}</select></div>
@@ -153,9 +156,9 @@ router.post('/ventas/importar', subida.single('archivo'), async (req, res, next)
     let duplicadas = 0;
     for (const venta of ventas) {
       const resultado = await consultar(
-        `INSERT IGNORE INTO ventas (estacion_id, folio, fecha_hora, producto, litros, importe, origen)
-         VALUES (?, ?, ?, ?, ?, ?, 'manual')`,
-        [estacionId, venta.folio, venta.fecha_hora, venta.producto, venta.litros, venta.importe]
+        `INSERT IGNORE INTO ventas (estacion_id, folio, fecha_hora, producto, litros, importe, forma_pago, origen)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'manual')`,
+        [estacionId, venta.folio, venta.fecha_hora, venta.producto, venta.litros, venta.importe, venta.forma_pago ?? null]
       );
       if (resultado.affectedRows > 0) insertadas++; else duplicadas++;
     }
@@ -168,6 +171,10 @@ router.post('/ventas/importar', subida.single('archivo'), async (req, res, next)
       <strong>${escaparHTML(estacion.nombre)}</strong>: ${insertadas} ventas nuevas, ${duplicadas} duplicadas omitidas, ${errores.length} filas con error.${listaErrores}</div>`);
   } catch (err) { next(err); }
 });
+
+// Pantallas del motor de boletos (paso 5): parámetros y boletos.
+router.use(require('./admin-parametros'));
+router.use(require('./admin-boletos'));
 
 function formatearFecha(valor) {
   if (!valor) return '—';
