@@ -53,6 +53,7 @@ Sin base de datos configurada el sitio sigue funcionando; registro y panel respo
 - `/admin/boletos` — reclamo manual de folios, boletos de oficina, listado con filtros y detalle
 - `/admin/parametros` — parámetros del sorteo (tabla `configuracion`) editables con validación
 - `/admin/bitacora` — bitácora consultable del motor (emisiones, rechazos, anulaciones)
+- `/admin/captura` — captura manual de ventas (alta individual y CSV) para estaciones sin importación
 - `/admin/whatsapp` — conversaciones del bot, estado de envíos y reenvío manual
 - `/webhooks/whatsapp` — webhook de la Cloud API de Meta (verificación GET + mensajes POST firmados)
 - `/salud` — estado del servicio

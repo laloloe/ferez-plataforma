@@ -112,6 +112,7 @@ class FuenteManual extends FuenteDeVentas {
         continue;
       }
       ventas.push({
+        fila: numeroFila,
         folio,
         fecha_hora: fecha,
         producto: mapa.producto !== undefined ? String(fila[mapa.producto] ?? '').trim() || null : null,

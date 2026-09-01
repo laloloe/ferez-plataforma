@@ -176,6 +176,7 @@ router.post('/ventas/importar', subida.single('archivo'), async (req, res, next)
 router.use(require('./admin-parametros'));
 router.use(require('./admin-boletos'));
 router.use(require('./admin-whatsapp'));
+router.use(require('./admin-captura'));
 
 function formatearFecha(valor) {
   if (!valor) return '—';
