@@ -10,7 +10,8 @@ const rutaAdmin = require('./rutas/admin');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+// rawBody se conserva para validar la firma del webhook de WhatsApp.
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: false }));
 
 // Archivos estáticos (landing)
@@ -41,6 +42,7 @@ app.post('/api/facturacion', (req, res) => {
 
 app.use(rutaRegistro);
 app.use(require('./rutas/padron'));
+app.use(require('./rutas/webhook-whatsapp'));
 app.use('/admin', rutaAdmin);
 
 // Cualquier otra ruta devuelve la landing

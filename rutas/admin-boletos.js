@@ -5,6 +5,7 @@
 const express = require('express');
 const { consultar } = require('../lib/db');
 const { normalizarTelefono } = require('../lib/telefono');
+const { leerConfiguracion } = require('../lib/configuracion');
 const motor = require('../servicios/motor-boletos');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
 
@@ -19,8 +20,14 @@ function formatearFecha(valor) {
 
 const ETIQUETA_ESTADO = { vigente: 'VIGENTE', anulado: 'ANULADO' };
 
+async function ventaOficinaActiva() {
+  const config = await leerConfiguracion();
+  return config.venta_oficina_habilitada === true;
+}
+
 async function render(res, filtros = {}, avisoHTML = '') {
   const estaciones = await consultar('SELECT id, nombre FROM estaciones WHERE activa = 1 ORDER BY id');
+  const ventaOficinaHabilitada = await ventaOficinaActiva();
 
   const condiciones = [];
   const parametros = [];
@@ -67,6 +74,7 @@ async function render(res, filtros = {}, avisoHTML = '') {
       <div><label>Estación</label><select name="estacion_id" required>${opciones}</select></div>
       <button type="submit">Reclamar</button>
     </form>
+    ${ventaOficinaHabilitada ? `
     <h2>Boleto de oficina</h2>
     <form class="linea" method="post" action="/admin/boletos/oficina"
           onsubmit="return confirm('¿Emitir boleto de oficina para ' + this.nombre.value + '?')">
@@ -74,7 +82,7 @@ async function render(res, filtros = {}, avisoHTML = '') {
       <div><label>Teléfono</label><input type="tel" name="telefono" required></div>
       <div><label>Número de recibo</label><input type="text" name="recibo" required></div>
       <button type="submit">Emitir</button>
-    </form>
+    </form>` : ''}
     <h2>Listado</h2>
     <form class="linea" method="get" action="/admin/boletos">
       <div><label>Estación</label><select name="estacion_id"><option value="">Todas</option>${opciones}</select></div>
@@ -111,6 +119,10 @@ router.post('/boletos/reclamar', async (req, res, next) => {
 
 router.post('/boletos/oficina', async (req, res, next) => {
   try {
+    if (!await ventaOficinaActiva()) {
+      return render(res, {}, `<p class="msj error">La venta de boletos de oficina está deshabilitada
+        (<code>venta_oficina_habilitada=false</code>): el sorteo es sin venta de boletos. No se emitió nada.</p>`);
+    }
     const resultado = await motor.emitirBoletoOficina({
       nombre: req.body.nombre, telefono: req.body.telefono,
       recibo: req.body.recibo, actor: `admin:${req.actor}`,
