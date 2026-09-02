@@ -34,7 +34,8 @@ Abre http://localhost:3000
 | `DATABASE_URL` | Cadena de conexión `mysql://usuario:contraseña@host:puerto/base` (TiDB Cloud) |
 | `DB_HOST`, `DB_PORT`, `DB_USUARIO`, `DB_PASSWORD`, `DB_NOMBRE` | Alternativa a `DATABASE_URL` |
 | `DB_SSL` | `off` para desactivar TLS (solo desarrollo local) |
-| `ADMIN_USUARIO`, `ADMIN_PASSWORD` | Credenciales del panel `/admin` |
+| `ADMIN_USUARIO`, `ADMIN_PASSWORD` | Credencial provisional de `/admin`; se deshabilita sola al existir un administrador en la tabla `usuarios` |
+| `SESSION_SECRET` | Opcional: secreto de las sesiones del panel (si falta, se deriva de la credencial provisional) |
 | `WHATSAPP_TOKEN` | Token de acceso de la app de Meta (hoy: número de prueba) |
 | `WHATSAPP_PHONE_NUMBER_ID` | Id del número emisor en la Cloud API |
 | `WHATSAPP_VERIFY_TOKEN` | Token que se configura en la verificación del webhook |
@@ -50,7 +51,9 @@ Sin base de datos configurada el sitio sigue funcionando; registro y panel respo
 - `/aviso-privacidad` — aviso de privacidad (LFPDPPP)
 - `/boletos` — padrón público: contador, buscador (boleto o teléfono) y lista completa paginada
 - `/boletos/sellado` — sellado del padrón: explicación antes; CSV, acta y SHA-256 después
-- `/admin` — panel: resumen, participantes, importación de ventas por CSV
+- `/admin` — panel con usuarios individuales y roles (administrador / operador): resumen, participantes, importación CSV
+- `/admin/acceso` — pantalla de acceso (correo y contraseña; sesión por cookie firmada)
+- `/admin/usuarios` — gestión de usuarios (solo administrador): alta con contraseña temporal, desactivación y rol
 - `/admin/boletos` — reclamo manual de folios, boletos de oficina, listado con filtros y detalle
 - `/admin/parametros` — parámetros del sorteo (tabla `configuracion`) editables con validación
 - `/admin/bitacora` — bitácora consultable del motor (emisiones, rechazos, anulaciones)

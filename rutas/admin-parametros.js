@@ -4,6 +4,7 @@
 
 const express = require('express');
 const { DEFINICIONES, validarValor, leerConfiguracionCruda, guardarValor } = require('../lib/configuracion');
+const { registrarAjuste } = require('../servicios/usuarios');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
 
 const router = express.Router();
@@ -44,6 +45,7 @@ router.post('/parametros', async (req, res, next) => {
       return render(res, `<p class="msj error"><strong>${escaparHTML(clave)}</strong>: ${escaparHTML(validacion.error)}</p>`);
     }
     await guardarValor(clave, validacion.valor);
+    await registrarAjuste(req.actor, 'PARAMETRO', `${clave} = ${validacion.valor}`);
     await render(res, `<p class="msj ok"><strong>${escaparHTML(clave)}</strong> guardado: <code>${escaparHTML(validacion.valor)}</code></p>`);
   } catch (err) { next(err); }
 });

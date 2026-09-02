@@ -1,7 +1,9 @@
-// Panel básico de administración (SPEC sección 12, paso 4).
-// Autenticación HTTP Basic con credenciales en variables de entorno
-// (ADMIN_USUARIO, ADMIN_PASSWORD). Los roles diferenciados de la sección 8
-// llegarán con el panel completo.
+// Panel de administración con usuarios individuales y roles (ORDEN 6).
+// administrador: todo. operador: captura, boletos/reclamos, whatsapp y
+// bitácora; SIN parámetros, SIN sellado, SIN usuarios.
+// Mientras la tabla no tenga un administrador activo, la credencial de
+// entorno (ADMIN_USUARIO/ADMIN_PASSWORD) entra como administrador
+// provisional; con el primer administrador real, se deshabilita sola.
 
 const crypto = require('crypto');
 const express = require('express');
@@ -9,10 +11,14 @@ const multer = require('multer');
 const { configurada, consultar } = require('../lib/db');
 const { normalizarTelefono } = require('../lib/telefono');
 const { FuenteManual } = require('../fuentes/fuente-manual');
+const usuarios = require('../servicios/usuarios');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
 
 const router = express.Router();
 const subida = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+const COOKIE_SESION = 'sesion_ferez';
+const SOLO_ADMINISTRADOR = ['/parametros', '/sellado', '/usuarios'];
 
 function comparaSegura(a, b) {
   const bufA = Buffer.from(String(a));
@@ -20,23 +26,166 @@ function comparaSegura(a, b) {
   return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
 }
 
-router.use((req, res, next) => {
-  const usuario = process.env.ADMIN_USUARIO;
-  const password = process.env.ADMIN_PASSWORD;
-  if (!usuario || !password) {
-    return res.status(503).send(paginaAdmin('Panel no configurado',
-      '<h1>Panel no configurado</h1><p>Define las variables de entorno <code>ADMIN_USUARIO</code> y <code>ADMIN_PASSWORD</code>.</p>'));
+function leerCookie(req, nombre) {
+  for (const parte of String(req.headers.cookie ?? '').split(';')) {
+    const [clave, ...valor] = parte.trim().split('=');
+    if (clave === nombre) return decodeURIComponent(valor.join('='));
   }
-  const cabecera = req.headers.authorization || '';
-  if (cabecera.startsWith('Basic ')) {
-    const [u, ...resto] = Buffer.from(cabecera.slice(6), 'base64').toString('utf8').split(':');
-    if (comparaSegura(u, usuario) && comparaSegura(resto.join(':'), password)) {
-      req.actor = u;
-      return next();
+  return null;
+}
+
+function ponerCookieSesion(req, res, token) {
+  const seguro = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  res.set('Set-Cookie',
+    `${COOKIE_SESION}=${encodeURIComponent(token)}; Path=/admin; HttpOnly; SameSite=Lax${seguro ? '; Secure' : ''}${token ? '' : '; Max-Age=0'}`);
+}
+
+function paginaAcceso(res, avisoHTML = '', notaProvisional = '') {
+  res.send(paginaAdmin('Acceso', `
+    <h1>Acceso al panel</h1>
+    ${avisoHTML}
+    <form class="linea" method="post" action="/admin/acceso">
+      <div><label for="correo">Correo</label>
+      <input type="text" id="correo" name="correo" autocomplete="username" required></div>
+      <div><label for="contrasena">Contraseña</label>
+      <input type="password" id="contrasena" name="contrasena" autocomplete="current-password" required></div>
+      <button type="submit">Entrar</button>
+    </form>
+    ${notaProvisional}`));
+}
+
+async function accesoProvisionalDisponible() {
+  if (!process.env.ADMIN_USUARIO || !process.env.ADMIN_PASSWORD) return false;
+  if (!configurada()) return true;
+  return !(await usuarios.hayAdministradorActivo());
+}
+
+router.get('/acceso', async (req, res, next) => {
+  try {
+    const provisional = await accesoProvisionalDisponible();
+    const nota = provisional
+      ? '<p class="vacio">Aún no hay usuarios: entra con la credencial provisional de entorno para crear el primer administrador.</p>'
+      : '<p class="vacio">El acceso provisional de entorno está deshabilitado: entra con tu usuario personal.</p>';
+    paginaAcceso(res, '', nota);
+  } catch (err) { next(err); }
+});
+
+router.post('/acceso', async (req, res, next) => {
+  try {
+    const { correo, contrasena } = req.body || {};
+
+    if (configurada()) {
+      const resultado = await usuarios.autenticar(correo, contrasena);
+      if (resultado.ok) {
+        ponerCookieSesion(req, res, usuarios.firmarSesion({ u: resultado.usuario.id }));
+        return res.redirect(resultado.usuario.debe_cambiar ? '/admin/cambiar-contrasena' : '/admin');
+      }
+      if (resultado.motivo === 'bloqueado') {
+        return paginaAcceso(res, `<p class="msj error">Acceso bloqueado ${usuarios.MINUTOS_BLOQUEO} minutos por intentos fallidos. Espera e inténtalo de nuevo.</p>`);
+      }
+      if (resultado.motivo === 'inactivo') {
+        return paginaAcceso(res, '<p class="msj error">Este usuario está desactivado. Contacta a un administrador.</p>');
+      }
     }
+
+    // Credencial provisional de entorno: solo mientras no exista un
+    // administrador activo en la tabla.
+    if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD &&
+        comparaSegura(String(correo ?? ''), process.env.ADMIN_USUARIO)) {
+      if (configurada() && await usuarios.hayAdministradorActivo()) {
+        return paginaAcceso(res, '<p class="msj error">El acceso provisional de entorno está deshabilitado: ya existe un administrador. Entra con tu usuario personal.</p>');
+      }
+      if (comparaSegura(String(contrasena ?? ''), process.env.ADMIN_PASSWORD)) {
+        ponerCookieSesion(req, res, usuarios.firmarSesion({ u: 'entorno' }));
+        return res.redirect('/admin');
+      }
+    }
+    paginaAcceso(res, '<p class="msj error">Credenciales incorrectas.</p>');
+  } catch (err) { next(err); }
+});
+
+// ---------- Autenticación por sesión ----------
+router.use(async (req, res, next) => {
+  try {
+    const datos = usuarios.verificarSesion(leerCookie(req, COOKIE_SESION));
+    if (!datos) return res.redirect('/admin/acceso');
+
+    if (datos.u === 'entorno') {
+      if (configurada() && await usuarios.hayAdministradorActivo()) {
+        ponerCookieSesion(req, res, '');
+        return res.redirect('/admin/acceso');
+      }
+      req.usuario = {
+        id: null, correo: `entorno:${process.env.ADMIN_USUARIO}`,
+        nombre: 'Administrador provisional', rol: 'administrador', debe_cambiar: 0, provisional: true,
+      };
+    } else {
+      if (!configurada()) return res.redirect('/admin/acceso');
+      const usuario = await usuarios.obtenerUsuarioActivo(datos.u);
+      if (!usuario) {
+        ponerCookieSesion(req, res, '');
+        return res.redirect('/admin/acceso');
+      }
+      req.usuario = usuario;
+    }
+    req.actor = req.usuario.correo;
+    next();
+  } catch (err) { next(err); }
+});
+
+router.post('/salir', (req, res) => {
+  ponerCookieSesion(req, res, '');
+  res.redirect('/admin/acceso');
+});
+
+// Contraseña temporal: obliga el cambio antes de usar cualquier pantalla.
+router.use((req, res, next) => {
+  if (req.usuario.debe_cambiar && req.path !== '/cambiar-contrasena') {
+    return res.redirect('/admin/cambiar-contrasena');
   }
-  res.set('WWW-Authenticate', 'Basic realm="Panel Ferez", charset="UTF-8"');
-  return res.status(401).send('Se requiere autenticación.');
+  next();
+});
+
+function paginaCambio(res, avisoHTML = '', forzado = false) {
+  res.send(paginaAdmin('Cambiar contraseña', `
+    <h1>Cambiar contraseña</h1>
+    ${forzado ? '<p class="msj error">Tu contraseña es temporal: cámbiala para continuar.</p>' : ''}
+    ${avisoHTML}
+    <form class="linea" method="post" action="/admin/cambiar-contrasena">
+      <div><label>Contraseña actual</label><input type="password" name="actual" autocomplete="current-password" required></div>
+      <div><label>Nueva contraseña (mínimo ${usuarios.MIN_CONTRASENA} caracteres)</label>
+      <input type="password" name="nueva" autocomplete="new-password" required minlength="${usuarios.MIN_CONTRASENA}"></div>
+      <button type="submit">Cambiar</button>
+    </form>`));
+}
+
+router.get('/cambiar-contrasena', (req, res) => {
+  if (req.usuario.provisional) {
+    return res.send(paginaAdmin('Cambiar contraseña',
+      '<h1>Cambiar contraseña</h1><p>La credencial provisional se cambia en las variables de entorno. Crea tu usuario personal en <a href="/admin/usuarios">Usuarios</a>.</p>'));
+  }
+  paginaCambio(res, '', Boolean(req.usuario.debe_cambiar));
+});
+
+router.post('/cambiar-contrasena', async (req, res, next) => {
+  try {
+    if (req.usuario.provisional) return res.redirect('/admin/cambiar-contrasena');
+    const resultado = await usuarios.cambiarContrasena({
+      usuarioId: req.usuario.id, actual: req.body.actual, nueva: req.body.nueva,
+    });
+    if (!resultado.ok) return paginaCambio(res, `<p class="msj error">${escaparHTML(resultado.mensaje)}</p>`, Boolean(req.usuario.debe_cambiar));
+    res.redirect('/admin');
+  } catch (err) { next(err); }
+});
+
+// ---------- Roles ----------
+router.use((req, res, next) => {
+  const restringida = SOLO_ADMINISTRADOR.some((ruta) => req.path === ruta || req.path.startsWith(`${ruta}/`));
+  if (restringida && req.usuario.rol !== 'administrador') {
+    return res.status(403).send(paginaAdmin('Sin permiso',
+      '<h1>Sin permiso</h1><p>Esta sección es solo para administradores.</p><p><a href="/admin">Volver al inicio</a></p>'));
+  }
+  next();
 });
 
 router.use((req, res, next) => {
@@ -163,6 +312,11 @@ router.post('/ventas/importar', subida.single('archivo'), async (req, res, next)
       if (resultado.affectedRows > 0) insertadas++; else duplicadas++;
     }
 
+    await consultar(
+      `INSERT INTO bitacora_boletos (actor, tipo, estacion_id, resultado, detalle)
+       VALUES (?, 'captura', ?, 'IMPORTACION', ?)`,
+      [req.actor, estacionId, `Importación CSV: ${insertadas} nuevas, ${duplicadas} duplicadas, ${errores.length} con error.`]);
+
     const listaErrores = errores.length
       ? `<ul class="errores">${errores.slice(0, 20).map((e) => `<li>${escaparHTML(e)}</li>`).join('')}${errores.length > 20 ? `<li>… y ${errores.length - 20} más</li>` : ''}</ul>`
       : '';
@@ -178,6 +332,7 @@ router.use(require('./admin-boletos'));
 router.use(require('./admin-whatsapp'));
 router.use(require('./admin-captura'));
 router.use(require('./admin-sellado'));
+router.use(require('./admin-usuarios'));
 
 function formatearFecha(valor) {
   if (!valor) return '—';
