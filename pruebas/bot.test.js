@@ -90,7 +90,7 @@ function enviadorFalso(registro) {
 before(async () => {
   if (!hayBD) return;
   await ejecutarMigraciones();
-  for (const tabla of ['boletos', 'emisiones', 'bitacora_boletos', 'ventas', 'clientes', 'mensajes_whatsapp']) {
+  for (const tabla of ['sellos', 'boletos', 'emisiones', 'bitacora_boletos', 'ventas', 'clientes', 'mensajes_whatsapp']) {
     await consultar(`DELETE FROM ${tabla}`);
   }
   await consultar('UPDATE contador_boletos SET siguiente = 1 WHERE id = 1');

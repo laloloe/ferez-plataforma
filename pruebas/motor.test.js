@@ -31,7 +31,7 @@ async function crearVenta(folio, extras = {}) {
 before(async () => {
   if (!hayBD) return;
   await ejecutarMigraciones();
-  for (const tabla of ['boletos', 'emisiones', 'bitacora_boletos', 'ventas', 'clientes']) {
+  for (const tabla of ['sellos', 'boletos', 'emisiones', 'bitacora_boletos', 'ventas', 'clientes']) {
     await consultar(`DELETE FROM ${tabla}`);
   }
   await consultar('UPDATE contador_boletos SET siguiente = 1 WHERE id = 1');

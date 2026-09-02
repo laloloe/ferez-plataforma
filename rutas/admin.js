@@ -177,6 +177,7 @@ router.use(require('./admin-parametros'));
 router.use(require('./admin-boletos'));
 router.use(require('./admin-whatsapp'));
 router.use(require('./admin-captura'));
+router.use(require('./admin-sellado'));
 
 function formatearFecha(valor) {
   if (!valor) return '—';

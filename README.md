@@ -49,12 +49,14 @@ Sin base de datos configurada el sitio sigue funcionando; registro y panel respo
 - `/registro` — alta de participantes (nombre, teléfono E.164, aceptación del aviso)
 - `/aviso-privacidad` — aviso de privacidad (LFPDPPP)
 - `/boletos` — padrón público: contador, buscador (boleto o teléfono) y lista completa paginada
+- `/boletos/sellado` — sellado del padrón: explicación antes; CSV, acta y SHA-256 después
 - `/admin` — panel: resumen, participantes, importación de ventas por CSV
 - `/admin/boletos` — reclamo manual de folios, boletos de oficina, listado con filtros y detalle
 - `/admin/parametros` — parámetros del sorteo (tabla `configuracion`) editables con validación
 - `/admin/bitacora` — bitácora consultable del motor (emisiones, rechazos, anulaciones)
 - `/admin/captura` — captura manual de ventas (alta individual y CSV) para estaciones sin importación
 - `/admin/whatsapp` — conversaciones del bot, estado de envíos y reenvío manual
+- `/admin/sellado` — simulacro de sellado (repetible) y sellado real (único, con doble confirmación)
 - `/webhooks/whatsapp` — webhook de la Cloud API de Meta (verificación GET + mensajes POST firmados)
 - `/salud` — estado del servicio
 
@@ -79,7 +81,6 @@ editables desde `/admin/parametros`, y bitácora en `bitacora_boletos`.
 ## Pendientes (ver SPEC sección 11)
 
 - Integración con ControlGAS (ATIO) — implementar `FuenteControlGAS`
-- Sellado del padrón con hash y exportación (paso 8 de la sección 12)
 
 El bot corre hoy contra el número de prueba de Meta; pasar a la línea real es
 solo cambiar variables de entorno. El sorteo NO se anuncia al público hasta

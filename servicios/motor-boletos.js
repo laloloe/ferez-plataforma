@@ -16,6 +16,7 @@ const reglas = require('./reglas-boletos');
 
 // Códigos de rechazo estables: el bot los usará tal cual.
 const RECHAZOS = {
+  PADRON_SELLADO: 'El padrón fue sellado y es final. Ya no se emiten ni modifican boletos.',
   PADRON_CERRADO: 'El padrón del sorteo ya cerró. Ya no se emiten boletos.',
   CLIENTE_NO_REGISTRADO: 'Regístrate primero en ferez.mx/registro para participar.',
   ESTACION_NO_PARTICIPANTE: 'Esa estación no participa en el sorteo.',
@@ -102,6 +103,7 @@ async function reclamarFolio({ telefono, folio, estacionId, actor }) {
 
   if (!folioLimpio || !estacion) return terminar(rechazo('DATOS_INCOMPLETOS'));
 
+  if (await require('./sellado').haySelloReal()) return terminar(rechazo('PADRON_SELLADO'));
   if (reglas.padronCerrado(p)) return terminar(rechazo('PADRON_CERRADO'));
 
   const telefonoNormalizado = normalizarTelefono(String(telefono ?? ''));
@@ -190,6 +192,7 @@ async function emitirBoletoOficina({ nombre, telefono, recibo, actor }) {
   };
 
   if (!nombreLimpio || !reciboLimpio) return terminar(rechazo('DATOS_INCOMPLETOS'));
+  if (await require('./sellado').haySelloReal()) return terminar(rechazo('PADRON_SELLADO'));
   if (reglas.padronCerrado(p)) return terminar(rechazo('PADRON_CERRADO'));
 
   const telefonoNormalizado = normalizarTelefono(String(telefono ?? ''));
@@ -242,6 +245,9 @@ async function emitirBoletoOficina({ nombre, telefono, recibo, actor }) {
 // Marca una venta como cancelada o devuelta y anula sus boletos.
 // El boleto anulado NO se borra ni libera su número.
 async function marcarVenta({ ventaId, estado, actor }) {
+  if (await require('./sellado').haySelloReal()) {
+    return { ok: false, mensaje: RECHAZOS.PADRON_SELLADO };
+  }
   if (estado !== 'cancelada' && estado !== 'devuelta') {
     return { ok: false, mensaje: 'Estado no válido: usa "cancelada" o "devuelta".' };
   }
@@ -263,6 +269,9 @@ async function marcarVenta({ ventaId, estado, actor }) {
 
 // Anula un boleto individual con motivo (SPEC sección 8).
 async function anularBoleto({ folioBoleto, motivo, actor }) {
+  if (await require('./sellado').haySelloReal()) {
+    return { ok: false, mensaje: RECHAZOS.PADRON_SELLADO };
+  }
   const motivoLimpio = String(motivo ?? '').trim();
   if (!motivoLimpio) return { ok: false, mensaje: 'Indica el motivo de la anulación.' };
   const resultado = await consultar(

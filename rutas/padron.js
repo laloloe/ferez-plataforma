@@ -6,6 +6,7 @@ const { configurada } = require('../lib/db');
 const { leerConfiguracion } = require('../lib/configuracion');
 const reglas = require('../servicios/reglas-boletos');
 const padron = require('../servicios/padron');
+const sellado = require('../servicios/sellado');
 const { escaparHTML } = require('../lib/html');
 
 const router = express.Router();
@@ -49,6 +50,14 @@ a{color:var(--verde-prof)}
 .contador{font-family:var(--display);font-weight:400;font-size:clamp(52px,14vw,96px);line-height:1.1;color:var(--verde);letter-spacing:.02em}
 .contador-nota{font-family:var(--body);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:13px;color:#C9CEC6;margin-top:2px}
 .cerrado{background:#3A2C08;border:1.5px solid #B8860B;color:#F5DFA6;border-radius:10px;padding:12px 16px;max-width:560px;margin:18px auto 0;font-size:15px}
+.sellado-banner{background:#0D3D18;border:1.5px solid var(--verde);color:#D9F2DE;border-radius:10px;padding:12px 16px;max-width:560px;margin:18px auto 0;font-size:15px}
+.sellado-banner a{color:#9FE8B0;font-weight:700}
+.hash{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:clamp(13px,2.6vw,17px);word-break:break-all;background:var(--grafito);color:#9FE8B0;border-radius:10px;padding:16px 18px;text-align:center}
+.descargas{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}
+.descargas a{display:inline-block;background:var(--verde);color:var(--blanco);font-weight:700;text-decoration:none;padding:13px 22px;border-radius:8px}
+.descargas a:hover{background:var(--verde-prof)}
+.verificar{background:var(--blanco);border:1px solid var(--linea);border-radius:10px;padding:16px 18px;overflow-x:auto}
+.verificar code{display:block;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;margin:6px 0;white-space:nowrap}
 main{max-width:960px;margin:0 auto;padding:32px 20px 64px}
 h2{font-family:var(--display);font-weight:400;font-size:20px;margin:34px 0 12px;color:var(--grafito)}
 .buscador{display:flex;gap:10px;flex-wrap:wrap}
@@ -108,6 +117,7 @@ router.get('/boletos', async (req, res, next) => {
       zonaHoraria: config.zona_horaria || 'America/Chihuahua',
     });
     const vigentes = await padron.contadorVigentes();
+    const selloRealInfo = await sellado.selloReal();
 
     // Búsqueda
     const textoBusqueda = String(req.query.buscar ?? '').trim();
@@ -148,6 +158,8 @@ router.get('/boletos', async (req, res, next) => {
         puedes contar, comparar y encontrar el tuyo.</p>
         ${cerrado ? `<div class="cerrado">El padrón cerró el ${escaparHTML(config.cierre_padron)} (hora local).
           Ya no se emiten boletos nuevos; la lista queda tal como se selló.</div>` : ''}
+        ${selloRealInfo ? `<div class="sellado-banner">El padrón fue sellado el ${escaparHTML(selloRealInfo.fecha_local)}.
+          <a href="/boletos/sellado">Verifica aquí la lista sellada y su huella digital</a>.</div>` : ''}
       </section>
       <main>
         <h2>Busca tu boleto</h2>
@@ -173,6 +185,83 @@ router.get('/boletos', async (req, res, next) => {
         física y presencial ante notario; esta plataforma únicamente emite boletos y resguarda el padrón.</p>
       </main>`));
   } catch (err) { next(err); }
+});
+
+// ---------- Sellado del padrón (público) ----------
+
+router.get('/boletos/sellado', async (req, res, next) => {
+  try {
+    if (!configurada()) {
+      return res.status(503).send(pagina('<main><h2>Página no disponible por el momento</h2></main>'));
+    }
+    const sello = await sellado.selloReal();
+    if (!sello) {
+      const config = await leerConfiguracion();
+      return res.send(pagina(`
+        <section class="portada">
+          <h1>Sellado del padrón</h1>
+          <p>La lista de boletos se congelará antes del sorteo y aquí quedará su evidencia.</p>
+        </section>
+        <main>
+          <h2>Qué es el sellado</h2>
+          <p>Al cerrar el padrón (${escaparHTML(config.cierre_padron)}, hora local) la lista completa de boletos
+          se congela: se genera un archivo con todos los boletos, se calcula su huella digital (SHA-256)
+          y se publica junto con un acta. La lista se imprime y se entrega antes del sorteo.</p>
+          <p>Desde ese momento cualquier persona podrá descargar el archivo, calcular la huella en su propia
+          computadora y comprobar que la lista no fue alterada. El sorteo se realiza de forma física y
+          presencial ante notario; esta plataforma solo emite boletos y resguarda el padrón.</p>
+          <p><a href="/boletos">Volver al padrón</a></p>
+        </main>`));
+    }
+    res.send(pagina(`
+      <section class="portada">
+        <h1>Padrón sellado</h1>
+        <p>Sellado el ${escaparHTML(sello.fecha_local)} (hora local) con ${Number(sello.total).toLocaleString('es-MX')} boletos.
+        La lista es final: descárgala y comprueba su huella.</p>
+      </section>
+      <main>
+        <h2>Huella digital (SHA-256)</h2>
+        <p class="hash">${escaparHTML(sello.sha256)}</p>
+        <div class="descargas">
+          <a href="/boletos/sellado/padron-sf27.csv">Descargar padrón (CSV)</a>
+          <a href="/boletos/sellado/acta-sf27.pdf">Descargar acta (PDF)</a>
+        </div>
+        <h2>Cómo verificar tu descarga</h2>
+        <p>Calcula la huella del archivo descargado y compárala con la de arriba. Si coinciden,
+        tu copia es idéntica a la lista sellada.</p>
+        <div class="verificar">
+          <strong>Windows (Símbolo del sistema):</strong>
+          <code>certutil -hashfile padron-sf27.csv SHA256</code>
+          <strong>Mac o Linux (Terminal):</strong>
+          <code>shasum -a 256 padron-sf27.csv</code>
+        </div>
+        <p class="nota-legal">El acta incluye los totales por estación, origen y estado, y esta misma huella.
+        El sorteo se realiza de forma física y presencial ante notario.</p>
+        <p><a href="/boletos">Volver al padrón</a></p>
+      </main>`));
+  } catch (err) { next(err); }
+});
+
+// Los artefactos del sellado real se sirven tal cual se generaron.
+async function servirArchivoSellado(res, archivo) {
+  const info = await sellado.selloReal();
+  if (!info) return res.status(404).send('El padrón aún no ha sido sellado.');
+  const files = await sellado.archivosDeSello(info.id);
+  if (archivo === 'acta') {
+    res.set('Content-Type', 'application/pdf');
+    res.set('Content-Disposition', 'attachment; filename="acta-sf27.pdf"');
+    return res.send(files.acta);
+  }
+  res.set('Content-Type', 'text/csv; charset=utf-8');
+  res.set('Content-Disposition', 'attachment; filename="padron-sf27.csv"');
+  res.send(files.csv);
+}
+
+router.get('/boletos/sellado/padron-sf27.csv', async (req, res, next) => {
+  try { await servirArchivoSellado(res, 'csv'); } catch (err) { next(err); }
+});
+router.get('/boletos/sellado/acta-sf27.pdf', async (req, res, next) => {
+  try { await servirArchivoSellado(res, 'acta'); } catch (err) { next(err); }
 });
 
 module.exports = router;
