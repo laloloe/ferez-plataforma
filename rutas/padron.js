@@ -27,6 +27,7 @@ function pagina(cuerpo) {
 <title>Padrón de boletos — Gasolineras Ferez</title>
 <meta name="description" content="Padrón público del sorteo de Gasolineras Ferez: consulta tu boleto y revisa la lista completa.">
 <meta name="theme-color" content="#1E2124">
+<link rel="icon" type="image/png" href="/logos/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -83,7 +84,7 @@ footer a{color:#C9CEC6}
 </style>
 </head>
 <body>
-<header class="nav"><div class="wrap"><a class="brand" href="/">GASOLINERAS FEREZ</a></div></header>
+<header class="nav"><div class="wrap"><a class="brand" href="/" aria-label="Gasolineras Ferez, inicio"><img src="/logos/ferez-blanco.png" alt="FEREZ" style="height:40px;width:auto;display:block"></a></div></header>
 ${cuerpo}
 <footer>Estación de Servicio Ferez, S.A. de C.V. · <a href="/aviso-privacidad">Aviso de privacidad</a></footer>
 </body>
