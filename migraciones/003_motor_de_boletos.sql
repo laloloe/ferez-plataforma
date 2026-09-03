@@ -62,9 +62,11 @@ ALTER TABLE boletos ADD COLUMN motivo_anulacion VARCHAR(255) NULL;
 ALTER TABLE boletos ADD COLUMN fecha_anulacion DATETIME NULL;
 
 -- estado: 'activo' pasa a llamarse 'vigente' (SPEC v0.2: VIGENTE / ANULADO).
-ALTER TABLE boletos MODIFY estado ENUM('activo','vigente','anulado') NOT NULL DEFAULT 'vigente';
+-- TiDB solo permite AGREGAR valores al final de un ENUM: 'vigente' se anexa
+-- al final y 'activo' queda como valor legado en la lista (ninguna fila lo
+-- usa después del UPDATE y el código nunca lo escribe).
+ALTER TABLE boletos MODIFY estado ENUM('activo','anulado','vigente') NOT NULL DEFAULT 'vigente';
 UPDATE boletos SET estado = 'vigente' WHERE estado = 'activo';
-ALTER TABLE boletos MODIFY estado ENUM('vigente','anulado') NOT NULL DEFAULT 'vigente';
 
 -- ventas: forma de pago (para excluir vales) y estado (cancelada/devuelta
 -- anula sus boletos sin borrarlos ni liberar números).
@@ -77,9 +79,8 @@ ALTER TABLE estaciones ADD COLUMN participa_sorteo TINYINT(1) NOT NULL DEFAULT 1
 -- Reversa (documentada; el ejecutor no aplica reversas automáticamente):
 --   ALTER TABLE estaciones DROP COLUMN participa_sorteo;
 --   ALTER TABLE ventas DROP COLUMN estado; ALTER TABLE ventas DROP COLUMN forma_pago;
---   ALTER TABLE boletos MODIFY estado ENUM('activo','vigente','anulado') NOT NULL DEFAULT 'activo';
 --   UPDATE boletos SET estado='activo' WHERE estado='vigente';
---   ALTER TABLE boletos MODIFY estado ENUM('activo','anulado') NOT NULL DEFAULT 'activo';
+--   (el valor 'vigente' queda anexado al ENUM; TiDB no permite quitarlo)
 --   ALTER TABLE boletos DROP COLUMN fecha_anulacion; ... DROP COLUMN motivo_anulacion;
 --   ... DROP COLUMN origen; DROP KEY idx_boletos_emision; DROP COLUMN emision_id;
 --   ... DROP KEY uq_boletos_numero; DROP COLUMN numero;
