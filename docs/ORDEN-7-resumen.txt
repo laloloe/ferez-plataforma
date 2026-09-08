@@ -1,0 +1,100 @@
+ORDEN 7 — RESUMEN DE ENTREGA
+Importador del export real de ControlGAS y folio canónico
+Publicado en main (commit 1162ed4). 69 pruebas en verde (59 previas + 10 nuevas).
+
+============================================================
+REGLAS IMPLEMENTADAS
+============================================================
+
+Importador ControlGAS (fuentes/fuente-controlgas.js)
+  Lee el .xlsx "Control de Despachos" con su estructura real: título en
+  fila 3, razón social en fila 5, encabezados en fila 7, datos desde la
+  fila 8, y la fila TOTALES se ignora. Por fila:
+
+  - Despacho vacío o Importe en 0: se omite y se cuenta (no es venta).
+  - Producto no combustible (aceites, etc.): se importa igual pero
+    marcado como NO participante, para que el bot pueda responder
+    "producto no participante" en vez de "folio inexistente".
+  - Tipo vacío = contado; "Crédito" = crédito. Cliente, Código y Datos
+    se guardan (regla de flotillas); Nota se guarda como informativa.
+  - Vales: si Tipo o Datos contienen alguna palabra de
+    palabras_pago_excluido (sin distinguir mayúsculas ni acentos), la
+    forma de pago queda 'vales' y el motor la rechaza.
+  - La fecha de la venta es Fecha + Hora (el Turno no interviene).
+
+Normalizador de folio (normalizarFolio en servicios/reglas-boletos.js)
+  Una sola forma canónica compartida por importador, bot, captura manual
+  y motor: quita espacios, corta el sufijo -N del export y, si el folio
+  viene en formato de ticket impreso (entre paréntesis o con ceros a la
+  izquierda), quita los ceros iniciales y el dígito final agregado.
+
+  Así (00030934040), 00030934040, 3093404-0, "309 3404" y 3093404 son
+  el mismo folio. Los folios no numéricos (p. ej. OAS-1) no se tocan.
+
+Migración 010 (migraciones/010_controlgas_y_folios.sql)
+  Agrega a ventas las columnas tipo_pago, datos_pago, cliente_nombre,
+  cliente_codigo y nota; inserta la clave de configuración nueva; y
+  normaliza los folios ya guardados con UPDATE IGNORE (si una
+  normalización chocara con un folio existente en la misma estación,
+  esa fila se deja intacta para revisión manual).
+
+Sin datos reales
+  El fixture de pruebas se genera en código con nombres inventados;
+  ningún archivo de cliente entró al repositorio.
+
+============================================================
+CLAVES NUEVAS EN configuracion
+============================================================
+
+  palabras_pago_excluido = vale
+    Lista separada por comas; si Tipo o Datos del export contienen
+    alguna, la venta queda excluida. Editable en /admin/parametros.
+
+============================================================
+5 PASOS DE PRUEBA MANUAL (CON UN ARCHIVO REAL)
+============================================================
+
+1. Entra a /admin/ventas, elige la estación (Rubio o Campo), sube el
+   .xlsx de un día tal como sale de ControlGAS y verifica el reporte:
+   insertadas, omitidas (bombeos de prueba), no participantes (aceites)
+   y cero errores.
+
+2. Sube EL MISMO ARCHIVO otra vez: el reporte debe decir 0 insertadas
+   y todas duplicadas — nada se duplica.
+
+3. Toma un ticket impreso de ese día y mándale al bot de WhatsApp el
+   folio TAL COMO APARECE, con paréntesis y ceros, por ejemplo
+   (00030934040): debe generar boletos y mencionar la estación correcta.
+
+4. Busca en /admin/ventas una venta a crédito de flotilla y confirma
+   que Cliente, Código y Datos quedaron guardados.
+
+5. En /admin/parametros agrega una palabra a palabras_pago_excluido
+   (p. ej. edenred), reimporta un archivo con esa forma de pago en
+   Datos y confirma que esas ventas quedan con forma de pago 'vales'
+   y el bot las rechaza.
+
+============================================================
+SUPUESTOS
+============================================================
+
+- El sufijo -N del Despacho es un consecutivo interno que no forma
+  parte del folio del ticket; siempre se corta.
+- En el ticket impreso, el último dígito del número entre paréntesis
+  es un dígito agregado (verificador) — se descarta solo cuando el
+  folio trae paréntesis o ceros a la izquierda; un folio "limpio"
+  nunca pierde dígitos.
+- Un archivo = un día = una estación; la estación la elige el operador
+  al subir (el archivo no la trae de forma confiable).
+- La detección de .xlsx es por contenido (firma ZIP), no por extensión,
+  así que un CSV renombrado no rompe el importador.
+
+============================================================
+RECORDATORIO
+============================================================
+
+Revisa el deploy en Railway: el push a main ya disparó el build, y al
+arrancar aplicará la migración 010_controlgas_y_folios.sql (cinco
+ALTER TABLE ... ADD COLUMN, un INSERT de configuración y dos UPDATE de
+folios — nada de ENUMs ni DDL riesgoso para TiDB). Si truena a medias,
+pega el Deploy Log antes de relanzar.
