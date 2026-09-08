@@ -5,6 +5,7 @@
 const express = require('express');
 const multer = require('multer');
 const { consultar } = require('../lib/db');
+const { normalizarFolio } = require('../servicios/reglas-boletos');
 const { FuenteManual } = require('../fuentes/fuente-manual');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
 
@@ -27,6 +28,7 @@ async function registrarCapturaEnBitacora({ actor, folio, estacionId, resultado,
 
 // Inserta una venta capturada. Devuelve true si entró, false si era duplicada.
 async function insertarVentaCapturada({ estacionId, venta, actor }) {
+  venta = { ...venta, folio: normalizarFolio(venta.folio) };
   const resultado = await consultar(
     `INSERT IGNORE INTO ventas (estacion_id, folio, fecha_hora, producto, litros, importe, forma_pago, origen, capturada_por)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'captura', ?)`,

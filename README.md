@@ -63,12 +63,26 @@ Sin base de datos configurada el sitio sigue funcionando; registro y panel respo
 - `/webhooks/whatsapp` — webhook de la Cloud API de Meta (verificación GET + mensajes POST firmados)
 - `/salud` — estado del servicio
 
-## Importación de ventas (CSV)
+## Importación de ventas
 
-Mientras no exista la integración con ControlGAS, las ventas se importan por
-CSV desde `/admin/ventas` (un archivo por estación). Columnas requeridas:
-`folio` y `fecha_hora` (o `fecha`); opcionales: `producto`, `litros`, `importe`.
-Duplicados (mismo folio y estación) se omiten automáticamente.
+Desde `/admin/ventas` se cargan archivos por estación (uno por día):
+
+- **Excel de ControlGAS** (`.xlsx`, export "Control de Despachos"): se leen las
+  columnas reales (Fecha, Hora, Despacho, Producto, Cantidad, Importe, Nota,
+  Cliente, Código, Tipo, Datos). Filas sin despacho o con importe en cero se
+  omiten; productos no combustibles se importan como no participantes; si Tipo
+  o Datos contienen alguna palabra de `palabras_pago_excluido` (p. ej. "vale"),
+  la venta queda con forma de pago excluida. La fecha de la venta es Fecha + Hora.
+- **CSV manual**: columnas requeridas `folio` y `fecha_hora` (o `fecha`);
+  opcionales `producto`, `litros`, `importe`.
+
+Todo folio se guarda en su forma canónica (`normalizarFolio`): sin espacios,
+sin el sufijo `-N` del export y, si viene en formato de ticket impreso
+(paréntesis o ceros a la izquierda), sin los ceros iniciales ni el dígito final
+agregado. El bot y la captura manual aplican la misma normalización, así que
+`(00030934040)`, `3093404-0` y `3093404` son el mismo folio. Duplicados (mismo
+folio y estación) se omiten automáticamente: importar el mismo archivo dos
+veces no duplica nada.
 
 ## Despliegue
 
@@ -82,8 +96,6 @@ numeración global `SF27-######` sin huecos, parámetros en `configuracion`
 editables desde `/admin/parametros`, y bitácora en `bitacora_boletos`.
 
 ## Pendientes (ver SPEC sección 11)
-
-- Integración con ControlGAS (ATIO) — implementar `FuenteControlGAS`
 
 El bot corre hoy contra el número de prueba de Meta; pasar a la línea real es
 solo cambiar variables de entorno. El sorteo NO se anuncia al público hasta

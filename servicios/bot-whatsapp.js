@@ -14,7 +14,7 @@
 const crypto = require('crypto');
 const { consultar } = require('../lib/db');
 const { normalizarTelefono } = require('../lib/telefono');
-const { normalizarTexto } = require('./reglas-boletos');
+const { normalizarTexto, normalizarFolio } = require('./reglas-boletos');
 const motor = require('./motor-boletos');
 const whatsappApi = require('./whatsapp-api');
 
@@ -91,9 +91,11 @@ function clasificarTexto(texto) {
   const limpio = normalizarTexto(texto);
   if (!limpio) return { tipo: 'ayuda' };
   if (PALABRAS_AYUDA.has(limpio)) return { tipo: 'ayuda' };
+  // Se aceptan también los paréntesis del formato impreso en el ticket,
+  // p. ej. "(00030934040)"; normalizarFolio los resuelve al folio canónico.
   const candidato = String(texto).replace(/\s+/g, '').trim();
-  if (/^[A-Za-z0-9][A-Za-z0-9\-/.]{2,29}$/.test(candidato) && /\d/.test(candidato)) {
-    return { tipo: 'folio', folio: candidato };
+  if (/^[(]?[A-Za-z0-9][A-Za-z0-9\-/.]{2,29}[)]?$/.test(candidato) && /\d/.test(candidato)) {
+    return { tipo: 'folio', folio: normalizarFolio(candidato) };
   }
   return { tipo: 'ayuda' };
 }

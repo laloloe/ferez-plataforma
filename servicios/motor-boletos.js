@@ -88,7 +88,10 @@ async function emitirEnTransaccion(conexion, { emisionId, cantidad, clienteId, v
 async function reclamarFolio({ telefono, folio, estacionId, actor }) {
   const config = await leerConfiguracion();
   const p = parametrosDelMotor(config);
-  const folioLimpio = String(folio ?? '').trim();
+  // Folio canónico (ORDEN 7): la misma normalización que usan la
+  // importación y el bot, para que "3093404-0" y "(00030934040)" resuelvan
+  // al mismo despacho.
+  const folioLimpio = reglas.normalizarFolio(folio);
   const estacion = Number(estacionId);
 
   const terminar = async (resultado, boletosGenerados = 0, detalle = null) => {

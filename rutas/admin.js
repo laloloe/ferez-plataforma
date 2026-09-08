@@ -11,6 +11,10 @@ const multer = require('multer');
 const { configurada, consultar } = require('../lib/db');
 const { normalizarTelefono } = require('../lib/telefono');
 const { FuenteManual } = require('../fuentes/fuente-manual');
+const { FuenteControlGAS } = require('../fuentes/fuente-controlgas');
+const { normalizarFolio } = require('../servicios/reglas-boletos');
+const { importarVentas, registrarImportacion } = require('../servicios/importar-ventas');
+const { leerConfiguracion } = require('../lib/configuracion');
 const usuarios = require('../servicios/usuarios');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
 
@@ -268,13 +272,15 @@ async function paginaVentas(res, avisoHTML = '') {
   res.send(paginaAdmin('Ventas', `
     <h1>Ventas</h1>
     ${avisoHTML}
-    <h2>Importar ventas (CSV)</h2>
-    <p>Columnas requeridas: <code>folio</code> y <code>fecha_hora</code> (o <code>fecha</code>). Opcionales: <code>producto</code>, <code>litros</code>, <code>importe</code>, <code>forma_pago</code>. Un archivo por estación.</p>
+    <h2>Importar ventas</h2>
+    <p>Acepta el export <strong>Control de Despachos</strong> de ControlGAS (.xlsx, un día por archivo)
+    o un CSV con columnas <code>folio</code> y <code>fecha_hora</code> (opcionales: <code>producto</code>,
+    <code>litros</code>, <code>importe</code>, <code>forma_pago</code>). Un archivo por estación.</p>
     <form class="linea" method="post" action="/admin/ventas/importar" enctype="multipart/form-data">
       <div><label for="estacion_id">Estación</label>
       <select id="estacion_id" name="estacion_id" required>${opciones}</select></div>
-      <div><label for="archivo">Archivo CSV</label>
-      <input type="file" id="archivo" name="archivo" accept=".csv,text/csv" required></div>
+      <div><label for="archivo">Archivo (.xlsx o .csv)</label>
+      <input type="file" id="archivo" name="archivo" accept=".xlsx,.csv,text/csv" required></div>
       <button type="submit">Importar</button>
     </form>
     <h2>Últimas ventas importadas</h2>
@@ -298,31 +304,41 @@ router.post('/ventas/importar', subida.single('archivo'), async (req, res, next)
       return paginaVentas(res, '<p class="msj error">Selecciona un archivo CSV.</p>');
     }
 
-    const fuente = new FuenteManual(req.file.buffer);
-    const { ventas, errores } = await fuente.obtenerVentas();
-
-    let insertadas = 0;
-    let duplicadas = 0;
-    for (const venta of ventas) {
-      const resultado = await consultar(
-        `INSERT IGNORE INTO ventas (estacion_id, folio, fecha_hora, producto, litros, importe, forma_pago, origen)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'manual')`,
-        [estacionId, venta.folio, venta.fecha_hora, venta.producto, venta.litros, venta.importe, venta.forma_pago ?? null]
-      );
-      if (resultado.affectedRows > 0) insertadas++; else duplicadas++;
+    // El export de ControlGAS es un .xlsx (archivo ZIP: empieza con 'PK');
+    // cualquier otra cosa se trata como CSV manual.
+    const esExcel = req.file.buffer.length > 1 && req.file.buffer[0] === 0x50 && req.file.buffer[1] === 0x4B;
+    let ventas; let errores; let omitidas = 0; let noParticipantes = 0;
+    if (esExcel) {
+      const config = await leerConfiguracion();
+      const fuente = new FuenteControlGAS(req.file.buffer, {
+        productosParticipantes: config.productos_participantes ?? [],
+        palabrasPagoExcluido: config.palabras_pago_excluido ?? ['vale'],
+      });
+      ({ ventas, errores, omitidas, noParticipantes } = await fuente.obtenerVentas());
+    } else {
+      const fuente = new FuenteManual(req.file.buffer);
+      ({ ventas, errores } = await fuente.obtenerVentas());
+      for (const venta of ventas) venta.folio = normalizarFolio(venta.folio);
     }
 
-    await consultar(
-      `INSERT INTO bitacora_boletos (actor, tipo, estacion_id, resultado, detalle)
-       VALUES (?, 'captura', ?, 'IMPORTACION', ?)`,
-      [req.actor, estacionId, `Importación CSV: ${insertadas} nuevas, ${duplicadas} duplicadas, ${errores.length} con error.`]);
+    const { insertadas, duplicadas } = await importarVentas({
+      estacionId, ventas, origen: esExcel ? 'controlgas' : 'manual', actor: req.actor,
+    });
+    await registrarImportacion({
+      actor: req.actor, estacionId,
+      detalle: `Importación ${esExcel ? 'ControlGAS' : 'CSV'}: ${insertadas} nuevas, ${duplicadas} duplicadas, ` +
+        `${omitidas} omitidas (sin despacho o importe 0), ${noParticipantes} no participantes, ${errores.length} con error.`,
+    });
 
     const listaErrores = errores.length
       ? `<ul class="errores">${errores.slice(0, 20).map((e) => `<li>${escaparHTML(e)}</li>`).join('')}${errores.length > 20 ? `<li>… y ${errores.length - 20} más</li>` : ''}</ul>`
       : '';
     const clase = ventas.length || !errores.length ? 'ok' : 'error';
     await paginaVentas(res, `<div class="msj ${clase}">
-      <strong>${escaparHTML(estacion.nombre)}</strong>: ${insertadas} ventas nuevas, ${duplicadas} duplicadas omitidas, ${errores.length} filas con error.${listaErrores}</div>`);
+      <strong>${escaparHTML(estacion.nombre)}</strong> (${esExcel ? 'export ControlGAS' : 'CSV'}):
+      ${insertadas} ventas nuevas, ${duplicadas} duplicadas omitidas, ${omitidas} filas omitidas
+      (sin despacho o importe 0), ${noParticipantes} de producto no participante (importadas),
+      ${errores.length} filas con error.${listaErrores}</div>`);
   } catch (err) { next(err); }
 });
 

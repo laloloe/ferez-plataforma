@@ -68,7 +68,35 @@ function formatearFolioBoleto(formato, numero) {
   return formato.replace(/#+/, String(numero).padStart(coincidencia[0].length, '0'));
 }
 
+
+// Normalizador único de folio (ORDEN 7). El mismo folio puede llegar como:
+//   "3093404"        → 3093404   (export, columna Despacho)
+//   "3093404-0"      → 3093404   (export con sufijo -N)
+//   "(00030837400)"  → 3083740   (formato del ticket: ceros + folio + un dígito)
+//   "00030837400"    → 3083740   (ticket tecleado sin paréntesis)
+//   "309 3404"       → 3093404   (espacios del cliente)
+// Regla: se quitan espacios y paréntesis; si queda "dígitos-N" se corta el
+// sufijo; si el número venía entre paréntesis O trae ceros a la izquierda es
+// formato de ticket: se quitan los ceros y el dígito final agregado. Un folio
+// no numérico (captura manual tipo "OAS-1") se devuelve solo limpio.
+// SUPUESTO: los folios reales de ControlGAS nunca inician con cero.
+function normalizarFolio(entrada) {
+  let texto = String(entrada ?? '').replace(/\s+/g, '').trim();
+  if (!texto) return '';
+  const conParentesis = /^\(.*\)$/.test(texto);
+  if (conParentesis) texto = texto.slice(1, -1);
+  const conSufijo = texto.match(/^(\d+)-\d+$/);
+  if (conSufijo) texto = conSufijo[1];
+  if (!/^\d+$/.test(texto)) return texto; // no numérico: se deja como está
+  if (conParentesis || /^0/.test(texto)) {
+    texto = texto.replace(/^0+/, '');
+    texto = texto.slice(0, -1); // dígito final agregado en el ticket
+  }
+  return texto.replace(/^0+/, '') || '0';
+}
+
 module.exports = {
+  normalizarFolio,
   normalizarTexto,
   calcularCantidadBoletos,
   ahoraLocal,
