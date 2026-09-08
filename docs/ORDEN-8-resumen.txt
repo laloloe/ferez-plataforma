@@ -1,0 +1,110 @@
+ORDEN 8 — RESUMEN DE ENTREGA
+Constancia electrónica del boleto + muestra en PDF para el expediente
+Publicado en main (commit 7c4aa93). 77 pruebas en verde (8 nuevas).
+
+============================================================
+RUTAS NUEVAS
+============================================================
+
+/constancia (pública)
+  Formulario con número de boleto (SF27-...) y teléfono del titular a
+  10 dígitos. SOLO si ambos coinciden se muestra la constancia
+  completa; cualquier fallo (teléfono equivocado o boleto inexistente)
+  devuelve el mismo mensaje genérico, sin revelar si el boleto existe.
+  Límite de 10 intentos por hora por IP/teléfono, con asiento en
+  bitácora (tipo nuevo 'constancia'). Botón Imprimir con CSS de
+  impresión limpia (se ocultan barra, formulario y pie).
+
+/admin/sellado/muestra-boleto.pdf (solo administrador)
+  Botón "Generar muestra de boleto (PDF)" en /admin/sellado: constancia
+  de un boleto FICTICIO SF27-000000 con marca de agua "MUESTRA", todas
+  las leyendas y el espacio del número de permiso en blanco. Es el
+  anexo "muestra del boleto" de la solicitud ante la SEGOB.
+
+CONTENIDO DE LA CONSTANCIA
+  Denominación (SORTEO FEREZ 2027, con ambas razones sociales), bloque
+  del permiso, número de boleto, folio de la operación, fecha y hora de
+  emisión, estación, origen, estado (anulados con el motivo genérico),
+  monto elegible, titular enmascarado (primer nombre + inicial),
+  vigencia de la promoción, fecha del sorteo, condición de
+  participación en una línea, y las siete leyendas fijas: acceso libre
+  y gratuito; conserve esta constancia; caducidad de premios a los 20
+  días hábiles; denuncia ante el Ministerio Público en caso de robo o
+  extravío; entrega conforme a las bases en ferez.mx/bases;
+  aclaraciones (teléfono de la estación); quejas ante la Dirección
+  General de Juegos y Sorteos, Versalles 49, Col. Juárez, CDMX,
+  tel. 55 5209 8800. Ligas a /boletos y a las bases.
+
+MECANISMO "EN TRÁMITE"
+  Con numero_permiso vacío, la constancia lleva la marca de agua
+  "EN TRÁMITE — DOCUMENTO SIN VALIDEZ" y ninguna página pública la
+  enlaza (solo URL directa, para pruebas). Al llenar la clave en
+  /admin/parametros: la constancia sale limpia con el número real y
+  /boletos la enlaza automáticamente. Sin más despliegues.
+
+INTEGRACIONES
+  - El mensaje de éxito del bot termina con la liga a /constancia.
+  - El detalle de cada boleto en /admin/boletos enlaza su constancia
+    con el boleto prellenado.
+
+============================================================
+CLAVES NUEVAS EN configuracion
+============================================================
+
+  numero_permiso        (vacía) — número que otorgue la SEGOB; puede
+                        quedar vacía (tipo nuevo texto_opcional).
+  vigencia_promocion    "Del 1 de enero de 2027 al 16 de diciembre de 2027"
+  fecha_sorteo          "19 de diciembre de 2027"
+  telefono_aclaraciones (vacía) — mientras lo esté, la leyenda dice
+                        "en tu estación Ferez participante".
+
+============================================================
+CÓMO PROBAR EN 5 PASOS
+============================================================
+
+1. Entra directo a ferez.mx/constancia (no hay enlace público aún),
+   escribe un boleto real y el teléfono de su titular: debe salir la
+   constancia completa con la marca "EN TRÁMITE — DOCUMENTO SIN
+   VALIDEZ".
+
+2. Repite con un teléfono equivocado: mensaje genérico, sin pista de
+   si el boleto existe. Haz 10 intentos fallidos seguidos: el undécimo
+   pide esperar una hora (queda en /admin/bitacora, tipo constancia).
+
+3. Abre ferez.mx/boletos y confirma que NO hay enlace a la constancia.
+   En /admin/parametros pon un valor de prueba en numero_permiso,
+   recarga /boletos (ya enlaza) y consulta de nuevo la constancia:
+   sale limpia con el número. Borra el valor al terminar la prueba.
+
+4. En /admin/sellado pulsa "Generar muestra de boleto (PDF)" y revisa
+   que traiga marca MUESTRA, todas las leyendas y el espacio del
+   permiso en blanco.
+
+5. En el detalle de un boleto en /admin/boletos usa el enlace
+   "Constancia electrónica" y prueba el botón Imprimir (vista limpia,
+   sin navegación).
+
+============================================================
+SUPUESTOS
+============================================================
+
+- La vigencia y la fecha del sorteo son PLACEHOLDERS editables en
+  /admin/parametros; ajústalos a las fechas reales cuando estén
+  definidas (asumí cierre el 16-dic-2027 conforme a cierre_padron).
+- "Monto elegible" = importe total de la operación (lo que determinó
+  los boletos).
+- El domicilio y teléfono de la DGJS son los dictados en la orden.
+- La denominación usa "Estación de Servicio Feres, S.A. de C.V." tal
+  como está registrada la razón social (ORDEN 2).
+- Boletos de oficina: folio de operación y estación se muestran como
+  "Oficina" / "—" (no hay venta asociada).
+
+============================================================
+RECORDATORIO
+============================================================
+
+Revisa el deploy en Railway: el push a main ya disparó el build; al
+arrancar aplicará la migración 011_constancia.sql (INSERT de 4 claves
+y un MODIFY del ENUM de bitácora que SOLO agrega 'constancia' al
+final — seguro para TiDB). Si algo truena a medias, pega el Deploy Log
+antes de relanzar.
