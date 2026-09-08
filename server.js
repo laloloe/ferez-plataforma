@@ -10,6 +10,10 @@ const rutaAdmin = require('./rutas/admin');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Detrás del proxy de Railway: req.ip debe ser la IP real del visitante
+// (el límite por hora de /constancia depende de ella).
+app.set('trust proxy', 1);
+
 // rawBody se conserva para validar la firma del webhook de WhatsApp.
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: false }));
@@ -42,6 +46,7 @@ app.post('/api/facturacion', (req, res) => {
 
 app.use(rutaRegistro);
 app.use(require('./rutas/padron'));
+app.use(require('./rutas/constancia'));
 app.use(require('./rutas/webhook-whatsapp'));
 app.use('/admin', rutaAdmin);
 

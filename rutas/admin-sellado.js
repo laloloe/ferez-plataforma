@@ -6,6 +6,7 @@ const express = require('express');
 const { leerConfiguracion } = require('../lib/configuracion');
 const reglas = require('../servicios/reglas-boletos');
 const sellado = require('../servicios/sellado');
+const constancia = require('../servicios/constancia');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
 
 const router = express.Router();
@@ -57,6 +58,14 @@ async function render(res, avisoHTML = '') {
       <button type="submit">Ejecutar sellado real</button>
     </form>`}
 
+    <h2>Muestra para el expediente (SEGOB)</h2>
+    <p>Genera la constancia de un boleto <strong>ficticio</strong> (SF27-000000) en PDF, con todas
+    las leyendas y el número de permiso en blanco, marcada "MUESTRA". Es el anexo
+    "muestra del boleto" de la solicitud de permiso.</p>
+    <form class="linea" method="get" action="/admin/sellado/muestra-boleto.pdf">
+      <button type="submit">Generar muestra de boleto (PDF)</button>
+    </form>
+
     <h2>Historial</h2>
     ${filas
       ? `<table><tr><th>#</th><th>Tipo</th><th>Fecha local</th><th>Ejecutó</th><th>Boletos</th><th>SHA-256</th><th>Archivos</th></tr>${filas}</table>`
@@ -88,6 +97,17 @@ router.post('/sellado/real', async (req, res, next) => {
     }
     await render(res, `<p class="msj ok"><strong>Sellado real ejecutado.</strong> ${resultado.total} boletos,
       SHA-256 <code>${escaparHTML(resultado.sha256)}</code>. El padrón es final.</p>`);
+  } catch (err) { next(err); }
+});
+
+// Muestra de la constancia de boleto para el expediente ante la SEGOB.
+router.get('/sellado/muestra-boleto.pdf', async (req, res, next) => {
+  try {
+    const config = await leerConfiguracion();
+    const pdf = await constancia.generarMuestraPDF(config);
+    res.set('Content-Type', 'application/pdf');
+    res.set('Content-Disposition', 'attachment; filename="muestra-boleto-sf27.pdf"');
+    res.send(pdf);
   } catch (err) { next(err); }
 });
 

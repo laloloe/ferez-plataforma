@@ -171,6 +171,10 @@ router.get('/boletos', async (req, res, next) => {
         </form>
         <p class="ayuda">Por privacidad, el titular se muestra solo como primer nombre e inicial del apellido,
         y ningún teléfono se publica.</p>
+        ${String(config.numero_permiso ?? '').trim()
+          ? `<p class="ayuda">¿Eres el titular? Consulta la <a href="/constancia">constancia electrónica
+            de tu boleto</a> con todas las leyendas del permiso.</p>`
+          : ''}
         <div id="resultado">${resultadoHTML}</div>
 
         <h2 id="lista">Lista completa (${total.toLocaleString('es-MX')} boletos)</h2>

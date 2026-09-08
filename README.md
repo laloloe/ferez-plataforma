@@ -59,7 +59,8 @@ Sin base de datos configurada el sitio sigue funcionando; registro y panel respo
 - `/admin/bitacora` — bitácora consultable del motor (emisiones, rechazos, anulaciones)
 - `/admin/captura` — captura manual de ventas (alta individual y CSV) para estaciones sin importación
 - `/admin/whatsapp` — conversaciones del bot, estado de envíos y reenvío manual
-- `/admin/sellado` — simulacro de sellado (repetible) y sellado real (único, con doble confirmación)
+- `/admin/sellado` — simulacro de sellado (repetible), sellado real (único, con doble confirmación) y muestra de boleto en PDF para el expediente ante la SEGOB
+- `/constancia` — constancia electrónica del boleto (boleto + teléfono del titular; con `numero_permiso` vacío se muestra EN TRÁMITE y el sitio no la enlaza)
 - `/webhooks/whatsapp` — webhook de la Cloud API de Meta (verificación GET + mensajes POST firmados)
 - `/salud` — estado del servicio
 

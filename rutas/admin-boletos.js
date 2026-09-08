@@ -184,6 +184,8 @@ router.get('/boletos/detalle', async (req, res, next) => {
         <tr><th>Cliente</th><td>${escaparHTML(boleto.cliente)} · ${escaparHTML(boleto.telefono)}</td></tr>
         <tr><th>Estación</th><td>${escaparHTML(boleto.estacion ?? '—')}</td></tr>
         <tr><th>Emisión</th><td>${formatearFecha(boleto.emision_fecha)} por ${escaparHTML(boleto.emision_actor ?? '—')}</td></tr>
+        <tr><th>Constancia</th><td><a href="/constancia?boleto=${encodeURIComponent(boleto.folio_boleto)}" target="_blank">Constancia electrónica del boleto</a>
+          (pide el teléfono del titular)</td></tr>
       </table>
       ${boleto.estado === 'vigente' ? `
       <h2>Anular este boleto</h2>

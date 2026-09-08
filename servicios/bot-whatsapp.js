@@ -40,11 +40,12 @@ const TEXTOS = {
     `Para participar en el Sorteo Ferez 2027 primero regístrate en ${urlSitio()}/registro ` +
     `con este mismo teléfono. Cuando termines, reenvíame el folio de tu ticket.`,
   exito: (folio, estacion, boletos) =>
-    boletos.length === 1
+    (boletos.length === 1
       ? `Listo. Tu folio ${folio} de ${estacion} generó el boleto ${boletos[0]}. ` +
         `Guarda este mensaje; puedes verlo en el padrón público: ${urlSitio()}/boletos`
       : `Listo. Tu folio ${folio} de ${estacion} generó ${boletos.length} boletos: ${boletos.join(', ')}. ` +
-        `Guarda este mensaje; puedes verlos en el padrón público: ${urlSitio()}/boletos`,
+        `Guarda este mensaje; puedes verlos en el padrón público: ${urlSitio()}/boletos`) +
+    `\nLa constancia electrónica de tu boleto: ${urlSitio()}/constancia`,
   pregunta_estacion: (folio, opciones) =>
     `Encontramos el folio ${folio} en más de una estación. ¿En cuál cargaste? ` +
     `Responde solo con el número:\n` +
