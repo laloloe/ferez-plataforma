@@ -16,13 +16,14 @@ const { normalizarFolio } = require('../servicios/reglas-boletos');
 const { importarVentas, registrarImportacion } = require('../servicios/importar-ventas');
 const { leerConfiguracion } = require('../lib/configuracion');
 const usuarios = require('../servicios/usuarios');
+const reinicio = require('../servicios/reinicio');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
 
 const router = express.Router();
 const subida = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const COOKIE_SESION = 'sesion_ferez';
-const SOLO_ADMINISTRADOR = ['/parametros', '/sellado', '/usuarios'];
+const SOLO_ADMINISTRADOR = ['/parametros', '/sellado', '/usuarios', '/reinicio'];
 
 function comparaSegura(a, b) {
   const bufA = Buffer.from(String(a));
@@ -38,10 +39,12 @@ function leerCookie(req, nombre) {
   return null;
 }
 
+// Path=/ (no /admin): las páginas públicas necesitan ver la cookie para
+// mostrar el padrón completo en modo pruebas (ORDEN 9).
 function ponerCookieSesion(req, res, token) {
   const seguro = req.secure || req.headers['x-forwarded-proto'] === 'https';
   res.set('Set-Cookie',
-    `${COOKIE_SESION}=${encodeURIComponent(token)}; Path=/admin; HttpOnly; SameSite=Lax${seguro ? '; Secure' : ''}${token ? '' : '; Max-Age=0'}`);
+    `${COOKIE_SESION}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax${seguro ? '; Secure' : ''}${token ? '' : '; Max-Age=0'}`);
 }
 
 function paginaAcceso(res, avisoHTML = '', notaProvisional = '') {
@@ -201,25 +204,61 @@ router.use((req, res, next) => {
 });
 
 // ---------- Inicio: resumen ----------
+async function paginaInicio(req, res, avisoHTML = '') {
+  const [clientes] = await consultar('SELECT COUNT(*) AS total FROM clientes WHERE activo = 1');
+  const [ventas] = await consultar('SELECT COUNT(*) AS total FROM ventas');
+  const porEstacion = await consultar(
+    `SELECT e.nombre, COUNT(v.id) AS ventas
+     FROM estaciones e LEFT JOIN ventas v ON v.estacion_id = e.id
+     WHERE e.activa = 1 GROUP BY e.id, e.nombre ORDER BY e.id`
+  );
+  const filas = porEstacion.map((f) =>
+    `<tr><td>${escaparHTML(f.nombre)}</td><td>${f.ventas}</td></tr>`).join('');
+
+  // Reinicio de arranque: solo administrador, sin permiso y sin sellado real.
+  const puedeReiniciar = req.usuario.rol === 'administrador' && await reinicio.reinicioDisponible();
+  const reinicioHTML = puedeReiniciar ? `
+    <h2>Reinicio de arranque</h2>
+    <p><strong>Borra los datos de prueba</strong> (participantes, ventas, boletos, mensajes del bot,
+    bitácora de negocio y simulacros de sellado) y reinicia el consecutivo para que el siguiente
+    boleto sea el SF27-000001. Conserva usuarios, estaciones y configuración. Solo está disponible
+    mientras no haya número de permiso ni sellado real.</p>
+    <form class="linea" method="post" action="/admin/reinicio"
+          onsubmit="return confirm('SEGUNDA CONFIRMACIÓN: se borrarán TODOS los datos de prueba. ¿Ejecutar el reinicio de arranque?')">
+      <div><label>Escribe REINICIAR para confirmar</label>
+      <input type="text" name="confirmacion" autocomplete="off" placeholder="REINICIAR" required></div>
+      <button type="submit">Ejecutar reinicio de arranque</button>
+    </form>` : '';
+
+  res.send(paginaAdmin('Inicio', `
+    <h1>Resumen</h1>
+    ${avisoHTML}
+    <div class="tarjetas">
+      <div class="tarjeta"><b>${clientes.total}</b><span>participantes registrados</span></div>
+      <div class="tarjeta"><b>${ventas.total}</b><span>ventas importadas</span></div>
+    </div>
+    <h2>Ventas por estación</h2>
+    <table><tr><th>Estación</th><th>Ventas</th></tr>${filas}</table>
+    ${reinicioHTML}`));
+}
+
 router.get('/', async (req, res, next) => {
+  try { await paginaInicio(req, res); } catch (err) { next(err); }
+});
+
+router.post('/reinicio', async (req, res, next) => {
   try {
-    const [clientes] = await consultar('SELECT COUNT(*) AS total FROM clientes WHERE activo = 1');
-    const [ventas] = await consultar('SELECT COUNT(*) AS total FROM ventas');
-    const porEstacion = await consultar(
-      `SELECT e.nombre, COUNT(v.id) AS ventas
-       FROM estaciones e LEFT JOIN ventas v ON v.estacion_id = e.id
-       WHERE e.activa = 1 GROUP BY e.id, e.nombre ORDER BY e.id`
-    );
-    const filas = porEstacion.map((f) =>
-      `<tr><td>${escaparHTML(f.nombre)}</td><td>${f.ventas}</td></tr>`).join('');
-    res.send(paginaAdmin('Inicio', `
-      <h1>Resumen</h1>
-      <div class="tarjetas">
-        <div class="tarjeta"><b>${clientes.total}</b><span>participantes registrados</span></div>
-        <div class="tarjeta"><b>${ventas.total}</b><span>ventas importadas</span></div>
-      </div>
-      <h2>Ventas por estación</h2>
-      <table><tr><th>Estación</th><th>Ventas</th></tr>${filas}</table>`));
+    if (String(req.body.confirmacion ?? '').trim().toUpperCase() !== 'REINICIAR') {
+      return paginaInicio(req, res, '<p class="msj error">Confirmación incorrecta: escribe REINICIAR para ejecutar el reinicio de arranque.</p>');
+    }
+    const resultado = await reinicio.reiniciarArranque(`admin:${req.actor}`);
+    if (!resultado.ok) {
+      return paginaInicio(req, res, `<p class="msj error">${escaparHTML(resultado.mensaje)}</p>`);
+    }
+    const totales = Object.entries(resultado.conteos).map(([tabla, total]) => `${escaparHTML(tabla)}: ${total}`).join(', ');
+    await paginaInicio(req, res, `<p class="msj ok"><strong>Reinicio de arranque ejecutado.</strong>
+      Registros eliminados — ${totales}. El siguiente boleto será el SF27-000001.
+      Usuarios, estaciones y configuración quedaron intactos; el asiento quedó en la bitácora.</p>`);
   } catch (err) { next(err); }
 });
 

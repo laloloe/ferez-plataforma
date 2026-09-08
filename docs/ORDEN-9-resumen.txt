@@ -1,0 +1,109 @@
+ORDEN 9 — RESUMEN DE ENTREGA
+Modo pruebas público + reinicio de arranque
+83 pruebas en verde (6 nuevas).
+
+============================================================
+RUTAS CAMBIADAS
+============================================================
+
+/boletos y /boletos/sellado
+  Mientras numero_permiso esté vacía, el público ve una página sobria
+  "Próximamente" con la identidad del sitio: sin contador, sin lista,
+  sin buscador y sin mencionar el sorteo (ni en el título de la
+  pestaña). Un usuario del panel con sesión iniciada (administrador u
+  operador) ve las páginas completas con la franja superior en ámbar
+  "MODO PRUEBAS — SIN VALIDEZ".
+
+/ (landing) y /index.html
+  Con la clave vacía se ocultan la tarjeta "SORTEOS / Consultar mis
+  boletos" y la liga "Boletos de sorteo" del pie. El resto de la
+  página no cambia. /index.html pasa por el mismo filtro (no hay
+  forma de saltárselo).
+
+/registro
+  Sigue funcionando (las pruebas lo necesitan), con la misma franja
+  "MODO PRUEBAS — SIN VALIDEZ" mientras no haya permiso.
+
+/constancia
+  Sin cambios: ya traía su propio mecanismo EN TRÁMITE de la ORDEN 8.
+
+/admin (inicio) y POST /admin/reinicio  [NUEVO, solo administrador]
+  Botón "Reinicio de arranque" con doble confirmación (escribir
+  REINICIAR + diálogo). Visible y ejecutable SOLO si numero_permiso
+  está vacía Y no existe sellado real. Al ejecutarse:
+  - Borra: clientes, ventas, boletos, emisiones, mensajes de
+    WhatsApp, estados del bot, bitácora de negocio (reclamo, compra,
+    anulación, captura, sellado, constancia) y los simulacros de
+    sellado.
+  - Reinicia el consecutivo: el siguiente boleto es SF27-000001.
+  - Conserva: usuarios, estaciones, configuración y los asientos de
+    sistema de la bitácora (accesos y ajustes).
+  - Deja un asiento permanente en bitácora (tipo ajuste, resultado
+    REINICIO) con quién, cuándo y cuántos registros se eliminaron
+    por tabla.
+  El candado del sellado real no cambia.
+
+Al llenar numero_permiso en /admin/parametros TODO vuelve a ser
+público automáticamente, sin despliegue, y el botón de reinicio
+desaparece.
+
+CAMBIO TÉCNICO A NOTAR
+  La cookie de sesión del panel ahora se emite con Path=/ (antes
+  /admin) para que las páginas públicas puedan reconocer la sesión en
+  modo pruebas. Sigue HttpOnly + SameSite=Lax + Secure en https.
+
+============================================================
+CÓMO PROBAR EN 5 PASOS
+============================================================
+
+1. Sin sesión y con numero_permiso vacía: abre ferez.mx/boletos y
+   ferez.mx/boletos/sellado — deben mostrar "Próximamente". En la
+   portada no debe aparecer "Consultar mis boletos" ni "Boletos de
+   sorteo"; /registro debe mostrar la franja ámbar.
+
+2. Inicia sesión en /admin y vuelve a abrir /boletos: página completa
+   (contador, buscador, lista) con la franja "MODO PRUEBAS — SIN
+   VALIDEZ". Si tu sesión es de antes de este deploy, sal y vuelve a
+   entrar (la cookie cambió de alcance).
+
+3. En /admin/parametros pon un valor de prueba en numero_permiso y
+   revisa sin sesión (ventana privada): /boletos completo sin franja
+   y la landing con sus ligas. Borra el valor y confirma que todo se
+   vuelve a ocultar. Nota: el botón de reinicio desaparece mientras
+   la clave tenga valor.
+
+4. Con datos de prueba cargados y numero_permiso vacía: en /admin
+   (inicio) usa "Reinicio de arranque", escribe REINICIAR y confirma.
+   Verifica: /admin en ceros, /boletos (con sesión) en cero boletos,
+   usuarios y parámetros intactos, y el asiento REINICIO en
+   /admin/bitacora con los conteos.
+
+5. Reclama un folio nuevo (bot o /admin/boletos) y confirma que el
+   boleto emitido es SF27-000001.
+
+============================================================
+SUPUESTOS
+============================================================
+
+- "Sesión del panel" incluye administrador, operador y la credencial
+  provisional de entorno mientras siga habilitada: cualquiera de
+  ellos ve las páginas completas en modo pruebas (el REINICIO sí es
+  solo de administrador).
+- Las sesiones iniciadas ANTES de este deploy traen la cookie con el
+  alcance viejo (/admin): para ver /boletos en modo pruebas hay que
+  salir y volver a entrar una vez.
+- Sin base de datos configurada, el lado seguro es ocultar: la
+  landing sin ligas y /boletos en "Próximamente".
+- El reinicio no toca el candado del sellado real ni los asientos de
+  sistema (accesos, ajustes) — esos son historia permanente.
+- La página "Próximamente" evita la palabra "sorteo" a propósito; la
+  URL /boletos sigue existiendo pero no revela contenido.
+
+============================================================
+RECORDATORIO
+============================================================
+
+Revisa el deploy en Railway: este push NO trae migraciones nuevas
+(solo código), así que el arranque debe ser directo. Al probar,
+recuerda salir y volver a entrar al panel una vez por el cambio de
+alcance de la cookie.

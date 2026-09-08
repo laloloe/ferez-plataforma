@@ -7,6 +7,7 @@ const { leerConfiguracion } = require('../lib/configuracion');
 const reglas = require('../servicios/reglas-boletos');
 const padron = require('../servicios/padron');
 const sellado = require('../servicios/sellado');
+const modo = require('../servicios/modo-pruebas');
 const { escaparHTML } = require('../lib/html');
 
 const router = express.Router();
@@ -18,13 +19,13 @@ function formatearFecha(valor) {
   return `${dos(fecha.getDate())}/${dos(fecha.getMonth() + 1)}/${fecha.getFullYear()} ${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
 }
 
-function pagina(cuerpo) {
+function pagina(cuerpo, { franja = '', titulo = 'Padrón de boletos — Gasolineras Ferez' } = {}) {
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Padrón de boletos — Gasolineras Ferez</title>
+<title>${escaparHTML(titulo)}</title>
 <meta name="description" content="Padrón público del sorteo de Gasolineras Ferez: consulta tu boleto y revisa la lista completa.">
 <meta name="theme-color" content="#1E2124">
 <link rel="icon" type="image/png" href="/logos/favicon.png">
@@ -84,7 +85,7 @@ footer a{color:#C9CEC6}
 </style>
 </head>
 <body>
-<header class="nav"><div class="wrap"><a class="brand" href="/" aria-label="Gasolineras Ferez, inicio"><img src="/logos/ferez-blanco.png" alt="FEREZ" style="height:40px;width:auto;display:block"></a></div></header>
+${franja}<header class="nav"><div class="wrap"><a class="brand" href="/" aria-label="Gasolineras Ferez, inicio"><img src="/logos/ferez-blanco.png" alt="FEREZ" style="height:40px;width:auto;display:block"></a></div></header>
 ${cuerpo}
 <footer>Estación de Servicio Ferez, S.A. de C.V. · <a href="/aviso-privacidad">Aviso de privacidad</a></footer>
 </body>
@@ -104,8 +105,30 @@ function tablaBoletos(boletos, conTitular) {
   return `<div class="tabla-marco"><table>${encabezados}${filas}</table></div>`;
 }
 
+// Página sobria mientras no hay permiso de SEGOB: sin contador, sin lista,
+// sin buscador y sin mencionar el sorteo.
+const PROXIMAMENTE = `
+  <section class="portada">
+    <h1>Próximamente</h1>
+    <p>Estamos preparando esta sección. Vuelve a visitarnos pronto.</p>
+  </section>
+  <main><p class="vacio"><a href="/">Volver al inicio</a></p></main>`;
+const TITULO_PROXIMAMENTE = 'Próximamente — Gasolineras Ferez';
+
+// Devuelve la franja MODO PRUEBAS si hay sesión del panel, o null si la
+// petición debe ver "Próximamente". Fuera del modo pruebas devuelve ''.
+async function franjaOModoPruebas(req) {
+  if (!(await modo.enModoPruebasSeguro())) return '';
+  if (await modo.sesionDePanel(req)) return modo.franjaHTML();
+  return null;
+}
+
 router.get('/boletos', async (req, res, next) => {
   try {
+    const franja = await franjaOModoPruebas(req);
+    if (franja === null) {
+      return res.send(pagina(PROXIMAMENTE, { titulo: TITULO_PROXIMAMENTE }));
+    }
     if (!configurada()) {
       return res.status(503).send(pagina(`<main>
         <h2>Padrón en preparación</h2>
@@ -188,7 +211,7 @@ router.get('/boletos', async (req, res, next) => {
         <p class="nota-legal">Los boletos anulados permanecen en la lista con la leyenda
         "${escaparHTML(padron.MOTIVO_PUBLICO_ANULADO)}" y su número no se reutiliza. El sorteo se realiza de forma
         física y presencial ante notario; esta plataforma únicamente emite boletos y resguarda el padrón.</p>
-      </main>`));
+      </main>`, { franja }));
   } catch (err) { next(err); }
 });
 
@@ -196,6 +219,10 @@ router.get('/boletos', async (req, res, next) => {
 
 router.get('/boletos/sellado', async (req, res, next) => {
   try {
+    const franja = await franjaOModoPruebas(req);
+    if (franja === null) {
+      return res.send(pagina(PROXIMAMENTE, { titulo: TITULO_PROXIMAMENTE }));
+    }
     if (!configurada()) {
       return res.status(503).send(pagina('<main><h2>Página no disponible por el momento</h2></main>'));
     }
@@ -216,7 +243,7 @@ router.get('/boletos/sellado', async (req, res, next) => {
           computadora y comprobar que la lista no fue alterada. El sorteo se realiza de forma física y
           presencial ante notario; esta plataforma solo emite boletos y resguarda el padrón.</p>
           <p><a href="/boletos">Volver al padrón</a></p>
-        </main>`));
+        </main>`, { franja }));
     }
     res.send(pagina(`
       <section class="portada">
@@ -243,7 +270,7 @@ router.get('/boletos/sellado', async (req, res, next) => {
         <p class="nota-legal">El acta incluye los totales por estación, origen y estado, y esta misma huella.
         El sorteo se realiza de forma física y presencial ante notario.</p>
         <p><a href="/boletos">Volver al padrón</a></p>
-      </main>`));
+      </main>`, { franja }));
   } catch (err) { next(err); }
 });
 

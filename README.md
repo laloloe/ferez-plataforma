@@ -64,6 +64,14 @@ Sin base de datos configurada el sitio sigue funcionando; registro y panel respo
 - `/webhooks/whatsapp` — webhook de la Cloud API de Meta (verificación GET + mensajes POST firmados)
 - `/salud` — estado del servicio
 
+Modo pruebas (ORDEN 9): mientras `numero_permiso` esté vacía, `/boletos` y
+`/boletos/sellado` muestran al público una página "Próximamente", la landing
+oculta las ligas al sorteo y `/registro` lleva la franja "MODO PRUEBAS — SIN
+VALIDEZ". Una sesión del panel ve todo completo (con franja). En `/admin`
+(solo administrador) existe el "Reinicio de arranque": borra los datos de
+prueba y reinicia el consecutivo a SF27-000001; solo disponible sin permiso y
+sin sellado real.
+
 ## Importación de ventas
 
 Desde `/admin/ventas` se cargan archivos por estación (uno por día):
