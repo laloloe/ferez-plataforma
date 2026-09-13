@@ -87,7 +87,11 @@ oculta las ligas al sorteo y `/registro` lleva la franja "MODO PRUEBAS — SIN
 VALIDEZ". Una sesión del panel ve todo completo (con franja). En `/admin`
 (solo administrador) existe el "Reinicio de arranque": borra los datos de
 prueba y reinicia el consecutivo a SF27-000001; solo disponible sin permiso y
-sin sellado real.
+sin sellado real. Modo exhibición (ORDEN 12): con `numero_permiso` vacía y
+`modo_exhibicion=true`, el sorteo se muestra al público SIN sesión con
+banners "SIN VALIDEZ" (banda "DEMOSTRACIÓN" en la landing, franja "MODO
+PRUEBAS" en /boletos, /boletos/sellado y /registro); con permiso capturado
+la clave queda inerte.
 
 ## Importación de ventas
 

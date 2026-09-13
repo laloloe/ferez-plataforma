@@ -1,0 +1,84 @@
+ORDEN 12 — RESUMEN DE ENTREGA
+Modo exhibición: demo pública con banners de prueba
+103 pruebas en verde (4 nuevas).
+
+============================================================
+LO CAMBIADO
+============================================================
+
+Clave nueva: modo_exhibicion (configuracion, default false)
+  Editable en /admin/parametros. SOLO actúa mientras numero_permiso
+  esté vacía:
+
+  - true  → la landing muestra sus ligas del sorteo (tarjeta
+            "SORTEOS / Consultar mis boletos" y la liga del pie), y
+            /boletos, /boletos/sellado y /registro quedan visibles al
+            público SIN sesión, completos.
+  - false → comportamiento de la ORDEN 9: "Próximamente" y ligas
+            ocultas (solo sesiones del panel ven el sorteo).
+
+  Con numero_permiso llena, la clave queda inerte: todo público y
+  limpio, en cualquiera de sus dos valores (probado con ambas).
+
+Banners en modo exhibición (todos en ámbar, arriba)
+  - Landing: banda "DEMOSTRACIÓN — SIN VALIDEZ".
+  - /boletos, /boletos/sellado y /registro: la franja "MODO PRUEBAS —
+    SIN VALIDEZ" ahora la ve TODO visitante mientras la exhibición
+    esté activa (antes solo sesiones del panel).
+  - Las franjas ahora son position:sticky (no fixed): ocupan su
+    propio renglón y se quedan pegadas arriba al hacer scroll, sin
+    tapar contenido en ningún ancho de pantalla (probado que el HTML
+    de la franja usa sticky y no fixed).
+  - Ningún texto de la landing menciona "permiso en trámite"
+    (verificado con prueba automática); la marca de agua de la
+    constancia quedó exactamente como estaba.
+
+Sin cambios en motor, importación, sellado, constancia ni usuarios.
+Migración 013: solo el INSERT de la clave nueva.
+
+============================================================
+CÓMO PROBAR EN 5 PASOS
+============================================================
+
+1. Con numero_permiso vacía y modo_exhibicion=false (estado actual),
+   abre ferez.mx y ferez.mx/boletos en ventana privada: portada sin
+   ligas del sorteo y "Próximamente", como hasta hoy.
+
+2. En /admin/parametros pon modo_exhibicion en true. Recarga la
+   portada en la ventana privada: aparece la banda ámbar
+   "DEMOSTRACIÓN — SIN VALIDEZ" arriba y la tarjeta "SORTEOS /
+   Consultar mis boletos" (y "Boletos de sorteo" en el pie).
+
+3. Sin iniciar sesión, navega /boletos, /boletos/sellado y /registro:
+   páginas completas (contador, buscador, lista) con la franja "MODO
+   PRUEBAS — SIN VALIDEZ" arriba. Esta es la vista para la familia.
+
+4. Ábrelo en un iPhone (o achica la ventana): la franja ocupa su
+   renglón arriba, se queda pegada al hacer scroll y no tapa nada.
+
+5. Pon un valor de prueba en numero_permiso: todo queda limpio y sin
+   banners aunque modo_exhibicion siga en true. Bórralo y apaga
+   modo_exhibicion para volver al estado oculto.
+
+============================================================
+SUPUESTOS
+============================================================
+
+- "Visible al público" en exhibición incluye /boletos/sellado en su
+  estado actual (explicación del sellado pendiente); la constancia
+  /constancia no cambió: sigue accesible por URL directa con su marca
+  EN TRÁMITE, que la orden pidió dejar como está.
+- La banda de la landing usa la misma franja ámbar sticky que las
+  demás páginas, con el texto "DEMOSTRACIÓN — SIN VALIDEZ".
+- El reinicio de arranque (ORDEN 9) sigue disponible con la
+  exhibición encendida: su candado depende solo de numero_permiso
+  vacía y de que no haya sellado real.
+
+============================================================
+RECORDATORIO
+============================================================
+
+Revisa el deploy en Railway: al arrancar aplicará la migración
+013_modo_exhibicion.sql (un solo INSERT IGNORE en configuracion —
+sin riesgo para TiDB). Después enciende modo_exhibicion en
+/admin/parametros cuando quieras enseñárselo a la familia.

@@ -55,6 +55,7 @@ before(async () => {
   await consultar('UPDATE contador_boletos SET siguiente = 1 WHERE id = 1');
   await consultar("UPDATE configuracion SET valor = '2027-12-16 12:00' WHERE clave = 'cierre_padron'");
   await consultar("UPDATE configuracion SET valor = '' WHERE clave = 'numero_permiso'");
+  await consultar("UPDATE configuracion SET valor = 'false' WHERE clave = 'modo_exhibicion'");
   const [estacion] = await consultar("SELECT id FROM estaciones WHERE nombre = 'Rubio'");
   estacionId = estacion.id;
 

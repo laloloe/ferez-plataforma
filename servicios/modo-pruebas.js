@@ -17,6 +17,29 @@ async function enModoPruebas() {
   return !String(config.numero_permiso ?? '').trim();
 }
 
+// Estado del sorteo hacia el público sin sesión (ORDEN 12):
+//   'publico'    — numero_permiso llena: todo visible y limpio.
+//   'exhibicion' — sin permiso pero con modo_exhibicion=true: todo visible
+//                  con banners "SIN VALIDEZ" (demo para la familia).
+//   'oculto'     — sin permiso y sin exhibición: "Próximamente" y ligas
+//                  ocultas (solo sesiones del panel ven el sorteo).
+async function estadoPublico() {
+  if (!configurada()) return 'oculto';
+  const config = await leerConfiguracion();
+  if (String(config.numero_permiso ?? '').trim()) return 'publico';
+  return config.modo_exhibicion === true ? 'exhibicion' : 'oculto';
+}
+
+// Como estadoPublico, pero ante cualquier error responde 'oculto' (lado
+// seguro). Para las páginas que no pueden permitirse tronar por esto.
+async function estadoPublicoSeguro() {
+  try {
+    return await estadoPublico();
+  } catch {
+    return 'oculto';
+  }
+}
+
 // Como enModoPruebas, pero ante cualquier error responde "sí" (lado seguro:
 // ocultar). Para las páginas que no pueden permitirse tronar por esto.
 async function enModoPruebasSeguro() {
@@ -48,12 +71,26 @@ async function sesionDePanel(req) {
   return Boolean(await usuarios.obtenerUsuarioActivo(datos.u));
 }
 
-// Franja superior en ámbar. Estilos en línea para poder inyectarla en
-// cualquier página (públicas y estáticas) sin depender de su CSS.
-function franjaHTML() {
-  return '<div style="background:#F5C518;color:#1E2124;text-align:center;' +
-    'font-weight:700;padding:9px 14px;font-size:14px;letter-spacing:.06em">' +
-    'MODO PRUEBAS — SIN VALIDEZ</div>';
+// Franja superior en ámbar, pegada arriba al hacer scroll (sticky: nunca
+// tapa contenido, ni en viewports angostos). Estilos en línea para poder
+// inyectarla en cualquier página (públicas y estáticas) sin depender de su CSS.
+function franjaHTML(texto = 'MODO PRUEBAS — SIN VALIDEZ') {
+  return '<div style="position:sticky;top:0;z-index:1000;background:#F5C518;color:#1E2124;' +
+    'text-align:center;font-weight:700;padding:9px 14px;font-size:14px;letter-spacing:.06em;' +
+    `font-family:Arial,sans-serif">${texto}</div>`;
 }
 
-module.exports = { enModoPruebas, enModoPruebasSeguro, sesionDePanel, franjaHTML };
+// Banda de la landing en modo exhibición (ORDEN 12).
+function franjaExhibicionHTML() {
+  return franjaHTML('DEMOSTRACIÓN — SIN VALIDEZ');
+}
+
+module.exports = {
+  enModoPruebas,
+  enModoPruebasSeguro,
+  estadoPublico,
+  estadoPublicoSeguro,
+  sesionDePanel,
+  franjaHTML,
+  franjaExhibicionHTML,
+};

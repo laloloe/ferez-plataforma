@@ -110,10 +110,13 @@ const PROXIMAMENTE = `
   <main><p class="vacio"><a href="/">Volver al inicio</a></p></main>`;
 const TITULO_PROXIMAMENTE = 'Próximamente — Gasolineras Ferez';
 
-// Devuelve la franja MODO PRUEBAS si hay sesión del panel, o null si la
-// petición debe ver "Próximamente". Fuera del modo pruebas devuelve ''.
+// Devuelve la franja MODO PRUEBAS si el visitante puede ver el sorteo (modo
+// exhibición para todos, o sesión del panel), '' si el sorteo ya es público
+// limpio, o null si la petición debe ver "Próximamente" (ORDEN 9 y 12).
 async function franjaOModoPruebas(req) {
-  if (!(await modo.enModoPruebasSeguro())) return '';
+  const estado = await modo.estadoPublicoSeguro();
+  if (estado === 'publico') return '';
+  if (estado === 'exhibicion') return modo.franjaHTML();
   if (await modo.sesionDePanel(req)) return modo.franjaHTML();
   return null;
 }

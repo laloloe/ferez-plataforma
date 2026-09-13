@@ -35,8 +35,12 @@ function leerPagina(nombre) {
 
 async function servirLanding(req, res) {
   let html = leerPagina('index.html');
-  if (await modo.enModoPruebasSeguro()) {
+  const estado = await modo.estadoPublicoSeguro();
+  if (estado === 'oculto') {
     html = html.replace(/<!--sorteo-->[\s\S]*?<!--\/sorteo-->/g, '');
+  } else if (estado === 'exhibicion') {
+    // Demo pública (ORDEN 12): ligas visibles con banda "DEMOSTRACIÓN".
+    html = html.replace(/<body([^>]*)>/, (todo, atributos) => `<body${atributos}>${modo.franjaExhibicionHTML()}`);
   }
   res.type('html').send(html);
 }
