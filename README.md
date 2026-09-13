@@ -29,6 +29,13 @@ Abre http://localhost:3000
 
 ## Variables de entorno
 
+Importación por correo (ORDEN 10, opcional): `IMPORT_MAIL_HOST` (p. ej.
+imap.gmail.com), `IMPORT_MAIL_USER`, `IMPORT_MAIL_PASSWORD` (contraseña de
+aplicación) y opcional `IMPORT_MAIL_PORT` (993). Sin las tres primeras, la
+función queda apagada con un aviso al arrancar. El buzón se revisa cada
+`intervalo_correo_minutos` (configuracion) y hay botón "Revisar ahora" en
+/admin/ventas; solo importan los remitentes de /admin/remitentes.
+
 | Variable | Descripción |
 |---|---|
 | `DATABASE_URL` | Cadena de conexión `mysql://usuario:contraseña@host:puerto/base` (TiDB Cloud) |
@@ -59,6 +66,7 @@ Sin base de datos configurada el sitio sigue funcionando; registro y panel respo
 - `/admin/bitacora` — bitácora consultable del motor (emisiones, rechazos, anulaciones)
 - `/admin/captura` — captura manual de ventas (alta individual y CSV) para estaciones sin importación
 - `/admin/whatsapp` — conversaciones del bot, estado de envíos y reenvío manual
+- `/admin/remitentes` — lista blanca del buzón de importación (solo administrador): correo → estación, y qué estaciones esperan archivo diario
 - `/admin/sellado` — simulacro de sellado (repetible), sellado real (único, con doble confirmación) y muestra de boleto en PDF para el expediente ante la SEGOB
 - `/constancia` — constancia electrónica del boleto (boleto + teléfono del titular; con `numero_permiso` vacío se muestra EN TRÁMITE y el sitio no la enlaza)
 - `/webhooks/whatsapp` — webhook de la Cloud API de Meta (verificación GET + mensajes POST firmados)

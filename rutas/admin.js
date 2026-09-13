@@ -17,13 +17,14 @@ const { importarVentas, registrarImportacion } = require('../servicios/importar-
 const { leerConfiguracion } = require('../lib/configuracion');
 const usuarios = require('../servicios/usuarios');
 const reinicio = require('../servicios/reinicio');
+const importacionCorreo = require('../servicios/importacion-correo');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
 
 const router = express.Router();
 const subida = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const COOKIE_SESION = 'sesion_ferez';
-const SOLO_ADMINISTRADOR = ['/parametros', '/sellado', '/usuarios', '/reinicio'];
+const SOLO_ADMINISTRADOR = ['/parametros', '/sellado', '/usuarios', '/reinicio', '/remitentes'];
 
 function comparaSegura(a, b) {
   const bufA = Buffer.from(String(a));
@@ -296,6 +297,51 @@ router.get('/clientes', async (req, res, next) => {
 });
 
 // ---------- Ventas: listado + importación CSV ----------
+
+// Sección "Importación por correo" de la pantalla de Ventas.
+async function seccionCorreoHTML() {
+  const config = await leerConfiguracion();
+  const activo = importacionCorreo.configurado();
+  const faltantes = await importacionCorreo.estacionesConArchivoFaltante(config);
+  const { estado, ultimos, problemas } = await importacionCorreo.resumenPanel();
+
+  const alertas = faltantes.map((e) =>
+    `<p class="msj error"><strong>${escaparHTML(e.nombre)}</strong>: archivo de ayer PENDIENTE
+     (hora límite ${escaparHTML(String(config.hora_limite_archivo ?? '10:00'))}).</p>`).join('');
+
+  const filasArchivos = ultimos.map((a) => `<tr>
+    <td>${escaparHTML(a.estacion)}</td><td>${formatearFecha(a.fecha)}</td>
+    <td>${escaparHTML(a.nombre_archivo)}</td><td>${escaparHTML(a.remitente)}</td>
+    <td>${escaparHTML(a.reporte)}</td>
+    <td><code style="font-size:11px">${escaparHTML(a.sha256.slice(0, 16))}…</code></td></tr>`).join('');
+
+  const filasProblemas = problemas.map((p) => `<tr>
+    <td>${formatearFecha(p.fecha)}</td><td>${escaparHTML(p.remitente ?? '—')}</td>
+    <td>${p.resultado === 'rechazado' ? 'Rechazado' : 'Error'}</td>
+    <td style="white-space:normal">${escaparHTML(p.detalle ?? '')}</td></tr>`).join('');
+
+  return `
+    <h2>Importación por correo</h2>
+    ${activo
+      ? `<p>Buzón activo. Última revisión: <strong>${estado.ultima_revision ? formatearFecha(estado.ultima_revision) : 'aún ninguna'}</strong>
+         ${estado.detalle ? `— ${escaparHTML(estado.detalle)}` : ''}.
+         Se revisa cada ${escaparHTML(String(config.intervalo_correo_minutos ?? 10))} minutos.</p>`
+      : '<p class="vacio">Apagada: faltan las variables IMPORT_MAIL_HOST, IMPORT_MAIL_USER e IMPORT_MAIL_PASSWORD.</p>'}
+    <form class="linea" method="post" action="/admin/ventas/revisar-correo">
+      <button type="submit" ${activo ? '' : 'disabled'}>Revisar ahora</button>
+      <a href="/admin/remitentes" style="align-self:center;font-weight:600">Remitentes autorizados</a>
+    </form>
+    ${alertas}
+    ${filasArchivos
+      ? `<h3 style="font-size:15px;margin:14px 0 8px">Último archivo por estación</h3>
+         <table><tr><th>Estación</th><th>Fecha</th><th>Archivo</th><th>Remitente</th><th>Reporte</th><th>SHA-256</th></tr>${filasArchivos}</table>`
+      : ''}
+    ${filasProblemas
+      ? `<h3 style="font-size:15px;margin:14px 0 8px">Correos rechazados o con error</h3>
+         <table><tr><th>Fecha</th><th>Remitente</th><th>Estado</th><th>Detalle</th></tr>${filasProblemas}</table>`
+      : ''}`;
+}
+
 async function paginaVentas(res, avisoHTML = '') {
   const estaciones = await consultar('SELECT id, nombre FROM estaciones WHERE activa = 1 ORDER BY id');
   const recientes = await consultar(
@@ -311,6 +357,7 @@ async function paginaVentas(res, avisoHTML = '') {
   res.send(paginaAdmin('Ventas', `
     <h1>Ventas</h1>
     ${avisoHTML}
+    ${await seccionCorreoHTML()}
     <h2>Importar ventas</h2>
     <p>Acepta el export <strong>Control de Despachos</strong> de ControlGAS (.xlsx, un día por archivo)
     o un CSV con columnas <code>folio</code> y <code>fecha_hora</code> (opcionales: <code>producto</code>,
@@ -330,6 +377,18 @@ async function paginaVentas(res, avisoHTML = '') {
 
 router.get('/ventas', async (req, res, next) => {
   try { await paginaVentas(res); } catch (err) { next(err); }
+});
+
+// Botón "Revisar ahora" del buzón de importación.
+router.post('/ventas/revisar-correo', async (req, res, next) => {
+  try {
+    const resultado = await importacionCorreo.revisarBuzon();
+    const aviso = resultado.ok
+      ? `<p class="msj ok">Buzón revisado: ${resultado.revisados} correos (${resultado.procesados} procesados,
+         ${resultado.rechazados} rechazados, ${resultado.errores} con error, ${resultado.yaProcesados} repetidos).</p>`
+      : `<p class="msj error">${escaparHTML(resultado.mensaje)}</p>`;
+    await paginaVentas(res, aviso);
+  } catch (err) { next(err); }
 });
 
 router.post('/ventas/importar', subida.single('archivo'), async (req, res, next) => {
@@ -388,6 +447,7 @@ router.use(require('./admin-whatsapp'));
 router.use(require('./admin-captura'));
 router.use(require('./admin-sellado'));
 router.use(require('./admin-usuarios'));
+router.use(require('./admin-remitentes'));
 
 function formatearFecha(valor) {
   if (!valor) return '—';

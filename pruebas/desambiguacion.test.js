@@ -139,10 +139,15 @@ test('captura individual: duplicado por estación + folio rechazado con bitácor
 });
 
 test('CSV mixto: aceptadas y rechazadas renglón por renglón', { skip: !hayBD }, async () => {
+  // Fecha de ayer, dinámica: el reclamo posterior debe caer dentro del
+  // plazo de 7 días sin importar cuándo corran las pruebas.
+  const ayer = new Date(Date.now() - 86400000);
+  const dos = (n) => String(n).padStart(2, '0');
+  const fechaAyer = `${ayer.getFullYear()}-${dos(ayer.getMonth() + 1)}-${dos(ayer.getDate())}`;
   const csv = 'folio,fecha_hora,producto,litros,importe,forma_pago\n' +
-    'OAS-2,2026-09-01 10:00,Magna,40,800,contado\n' +   // válida
-    'OAS-1,2026-09-01 11:00,Magna,40,700,contado\n' +   // duplicada (ya capturada)
-    'OAS-3,31/02/2026,Magna,40,700,contado\n';          // fecha inválida
+    `OAS-2,${fechaAyer} 10:00,Magna,40,800,contado\n` +   // válida
+    `OAS-1,${fechaAyer} 11:00,Magna,40,700,contado\n` +   // duplicada (ya capturada)
+    'OAS-3,31/02/2026,Magna,40,700,contado\n';            // fecha inválida
   const { ventas, errores } = await new FuenteManual(csv).obtenerVentas();
   assert.equal(errores.length, 1);
   assert.equal(errores[0].includes('Fila 4'), true);

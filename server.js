@@ -98,6 +98,9 @@ async function iniciar() {
     // necesitan responden 503 y el resto del sitio sigue en pie.
     console.error('No se pudieron aplicar las migraciones:', err.message);
   }
+  // Importación por correo (ORDEN 10): revisa el buzón cada N minutos.
+  // Sin las variables IMPORT_MAIL_* queda apagada con un solo aviso.
+  require('./servicios/importacion-correo').iniciarRevisionPeriodica();
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Ferez plataforma escuchando en el puerto ${PORT}`);
   });

@@ -1,0 +1,124 @@
+ORDEN 10 — RESUMEN DE ENTREGA
+Importación automática por correo (buzón IMAP dedicado)
+92 pruebas en verde (9 nuevas).
+
+============================================================
+VARIABLES NUEVAS PARA RAILWAY
+============================================================
+
+  IMPORT_MAIL_HOST      imap.gmail.com
+  IMPORT_MAIL_USER      el correo del buzón dedicado
+  IMPORT_MAIL_PASSWORD  contraseña de aplicación de Google
+                        (Cuenta Google > Seguridad > Verificación en dos
+                        pasos > Contraseñas de aplicaciones)
+  IMPORT_MAIL_PORT      opcional, default 993 (TLS)
+
+  Sin las tres primeras, la función queda APAGADA con un solo aviso en
+  el log al arrancar; el resto del sistema no se entera. La contraseña
+  jamás se escribe en logs ni en bitácora (probado).
+
+============================================================
+RUTAS Y CLAVES NUEVAS
+============================================================
+
+/admin/remitentes (solo administrador)
+  Lista blanca del buzón: alta/baja de remitentes, cada correo
+  asignado a UNA estación — esa asignación decide a dónde se importa
+  el archivo, sin confiar en el contenido del Excel. En la misma
+  pantalla se marca qué estaciones esperan archivo diario
+  (Campo y Rubio nacen en Sí; Oasis en No, editable).
+
+/admin/ventas — sección nueva "Importación por correo"
+  Estado del buzón y última revisión, botón "Revisar ahora", alertas
+  en rojo de archivo faltante, último archivo por estación (nombre,
+  remitente, reporte y SHA-256) y correos rechazados o con error.
+
+Claves nuevas en configuracion (editables en /admin/parametros):
+  intervalo_correo_minutos  10   cada cuántos minutos se revisa el buzón
+  hora_limite_archivo       10:00  hora local límite para el archivo de ayer
+
+Tablas nuevas (migración 012): remitentes_autorizados,
+correos_importados (Message-ID único: un correo jamás se procesa dos
+veces), archivos_importados (el .xlsx ORIGINAL con SHA-256, remitente,
+fecha y reporte — auditoría ante disputas), importacion_correo_estado.
+Bandera espera_archivo_diario en estaciones. Tipo 'correo' agregado AL
+FINAL del ENUM de bitácora (seguro para TiDB).
+
+============================================================
+CÓMO FUNCIONA
+============================================================
+
+- Cada N minutos (y con "Revisar ahora") se leen los correos NO
+  leídos del buzón.
+- Remitente en lista blanca: se toman solo los adjuntos .xlsx
+  (verificados por firma ZIP, máximo 10 MB), se importan con el
+  importador de la ORDEN 7 a la estación del remitente, y el archivo
+  original queda guardado con su huella y su reporte (aceptadas,
+  duplicadas, omitidas, no participantes).
+- Remitente desconocido: el correo se marca leído, queda en bitácora
+  como rechazado y NO se le responde nada.
+- Adjunto ilegible o falla del importador: asiento de error, el
+  correo queda marcado (bandera IMAP) para revisión, y el resto de
+  adjuntos y correos se sigue procesando.
+- Vigilancia: pasada la hora límite local, toda estación con archivo
+  diario esperado y sin ventas del día anterior aparece en rojo en
+  /admin/ventas ("archivo de ayer PENDIENTE") y se asienta UNA vez al
+  día en bitácora.
+- Si algún día llega la API de CTN, sustituye este flujo por la misma
+  interfaz FuenteDeVentas; el correo queda de respaldo.
+
+============================================================
+CÓMO PROBAR EN 5 PASOS (CON UN CORREO REAL)
+============================================================
+
+1. Crea el buzón dedicado (Gmail), actívale verificación en dos pasos
+   y genera una contraseña de aplicación. Carga las tres variables en
+   Railway y redespliega; el log de arranque debe decir "Importación
+   por correo activa: buzón ...".
+
+2. En /admin/remitentes da de alta tu propio correo asignado a Rubio.
+
+3. Envía desde ese correo un mensaje al buzón con un export real de
+   ControlGAS adjunto (.xlsx). En /admin/ventas pulsa "Revisar ahora":
+   el reporte debe mostrar el archivo importado a Rubio con sus
+   aceptadas/duplicadas y su SHA-256, y las ventas deben aparecer en
+   el listado.
+
+4. Reenvía EL MISMO correo (o el mismo archivo en un correo nuevo):
+   la primera vez no se reprocesa (Message-ID repetido) y la segunda
+   importa con 0 aceptadas y todo duplicado. Después manda un correo
+   desde otra dirección no autorizada: debe quedar como "Rechazado"
+   en la sección, sin importar nada y sin recibir respuesta.
+
+5. Pon hora_limite_archivo en un minuto pasado (p. ej. 00:01) y
+   revisa /admin/ventas: la estación sin ventas de ayer debe salir en
+   rojo con "archivo de ayer PENDIENTE" y una sola vez en
+   /admin/bitacora (tipo correo). Regresa la clave a 10:00.
+
+============================================================
+SUPUESTOS
+============================================================
+
+- El buzón es DEDICADO a esto: la revisión marca como leídos todos
+  los correos no leídos que toca (autorizados y rechazados).
+- "Archivo de ayer presente" se mide por ventas de la estación con
+  fecha del día anterior (cualquier origen), no por la simple llegada
+  de un correo: lo que importa es que los datos estén.
+- Gmail con contraseña de aplicación (IMAP básico); si el proveedor
+  cambia, basta cambiar las variables.
+- Los adjuntos que no son .xlsx (o pesan más de 10 MB) se ignoran en
+  silencio dentro de un correo autorizado; el cuerpo del correo nunca
+  se interpreta.
+- El intervalo se lee de configuracion en cada ciclo: cambiarlo no
+  requiere redespliegue (aplica al siguiente ciclo).
+
+============================================================
+RECORDATORIO
+============================================================
+
+Revisa el deploy en Railway: al arrancar aplicará la migración
+012_importacion_correo.sql (4 CREATE TABLE, 1 ADD COLUMN, 2 INSERT de
+configuración y un MODIFY del ENUM de bitácora que SOLO agrega
+'correo' al final — seguro para TiDB). Después carga las variables
+IMPORT_MAIL_* cuando tengas el buzón listo; mientras no estén, la
+función queda apagada sin afectar nada.
