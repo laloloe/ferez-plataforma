@@ -1,0 +1,120 @@
+ORDEN 11 — RESUMEN DE ENTREGA
+Zona horaria única en presentación y reglas
+99 pruebas en verde (7 nuevas).
+
+REGLA IMPLEMENTADA
+  La base de datos guarda UTC (los datos existentes no se tocaron).
+  TODO lo que ve el humano y TODA regla de negocio con fechas usa la
+  clave zona_horaria de configuracion (America/Chihuahua), sin
+  depender de la zona del servidor. La utilería central es nueva:
+  lib/fechas.js (formatearFecha, marcaLocal, utcDesdeLocal, etc.).
+  Además, el pool de MySQL quedó fijado a UTC (timezone 'Z'): aunque
+  el servidor cambiara de zona algún día, nada se movería.
+
+============================================================
+LO CORREGIDO, PANTALLA POR PANTALLA
+============================================================
+
+/admin (todas con formato nuevo DD/MM/AAAA HH:MM, hora local):
+  - Bitácora ................ fechas de cada asiento (el 22:17Z del
+                               síntoma ahora se ve 16:17)
+  - Ventas .................. última revisión del buzón, último
+                               archivo por estación, correos con
+                               problema, listado de ventas
+  - Boletos y reclamos ...... emisión, venta origen, anulación,
+                               bitácora del detalle
+  - Captura ................. últimas capturas
+  - WhatsApp ................ conversaciones y mensajes
+  - Usuarios ................ último acceso
+  - Sellado ................. ya guardaba texto en hora local (igual)
+
+Público:
+  - /boletos ................ fechas de emisión del padrón y del
+                               resultado de búsqueda
+  - /constancia ............. fecha y hora de emisión del boleto
+  - /boletos/sellado ........ (las fechas del sello ya eran locales)
+
+Bot de WhatsApp:
+  - El mensaje "ese folio ya generó boleto el AAAA-MM-DD" ahora da el
+    día LOCAL de la emisión (era el día UTC: podía decir el día
+    siguiente en reclamos nocturnos).
+
+Sellado:
+  - CSV canónico: fecha_emision ahora va en HORA LOCAL, formato fijo
+    (el hash sigue siendo reproducible: dos simulacros seguidos dan el
+    mismo SHA-256 — probado).
+  - Acta PDF: declara explícitamente "Todas las fechas de emisión del
+    archivo CSV están expresadas en hora local (America/Chihuahua)".
+  - Los simulacros ya generados no se corrigieron; el formato aplica
+    de aquí en adelante.
+
+Reglas de negocio (evaluadas en hora local):
+  - cierre_padron: 16-dic-2027 12:00 es mediodía DE CHIHUAHUA (18:00Z).
+    Probado con reloj simulado: a las 11:59 locales el motor emite; a
+    las 12:01 responde PADRON_CERRADO. Igual el candado del sellado
+    real, que usa la misma función.
+  - Plazo D+7: el día de la venta es su día LOCAL, con corte a fin de
+    día local. Una venta a las 23:30 locales (05:30Z del día
+    siguiente) ya no "pierde" horas de plazo (antes el día UTC la
+    corría un día).
+  - hora_limite_archivo y "ventas del día anterior": el día de ayer se
+    traduce a un rango de instantes UTC; la venta de las 23:30 locales
+    cuenta para SU día (antes la alerta podía marcar pendiente una
+    estación que sí mandó archivo).
+
+Fuentes de importación (para sostener la regla "la BD guarda UTC"):
+  - FuenteControlGAS, CSV manual y captura individual convierten la
+    hora de pared del ticket (local de la estación) al instante UTC al
+    guardar. Antes guardaban la hora de pared tal cual.
+
+============================================================
+CÓMO PROBAR EN 5 PASOS
+============================================================
+
+1. Haz cualquier acción en el panel (un reclamo, un cambio de
+   parámetro) y revisa /admin/bitacora: la hora del asiento debe
+   coincidir con tu reloj de Cuauhtémoc, no +6 horas.
+
+2. Importa un export de ControlGAS y abre /admin/ventas: la hora de
+   cada venta debe ser la del ticket impreso (p. ej. la carga de las
+   08:15 se ve 08:15).
+
+3. Reclama un folio por el bot y busca el boleto en /boletos y en
+   /constancia: la fecha de emisión debe ser tu hora local del
+   momento del reclamo.
+
+4. En /admin/sellado ejecuta DOS simulacros seguidos: mismo SHA-256.
+   Abre el CSV: las fechas de emisión deben verse en hora local; el
+   acta debe decir que las fechas van en hora local (America/
+   Chihuahua).
+
+5. Pon hora_limite_archivo en un minuto recién pasado y revisa
+   /admin/ventas: la alerta de "archivo de ayer PENDIENTE" debe
+   respetar el día local (una estación cuyo último despacho fue a las
+   23:30 de ayer NO debe salir pendiente). Regresa la clave a 10:00.
+
+============================================================
+SUPUESTOS
+============================================================
+
+- Las horas del export de ControlGAS, del CSV manual y de la captura
+  individual son hora de pared LOCAL de la estación (la de
+  zona_horaria); por eso ahora se convierten a UTC al guardar.
+- Las ventas de PRUEBA importadas antes de esta orden quedaron
+  guardadas con la hora de pared tal cual (sin convertir): pueden
+  verse corridas −6 h en pantalla. No se corrigieron ("no tocar datos
+  existentes") y el Reinicio de arranque las borrará antes de la
+  captación real, así que ninguna venta real quedará mal.
+- Chihuahua no tiene horario de verano desde 2022; aun así la
+  conversión es genérica (funcionaría con cualquier zona IANA que se
+  ponga en zona_horaria).
+- El formato de presentación quedó unificado en DD/MM/AAAA HH:MM
+  (antes /admin mezclaba AAAA-MM-DD).
+
+============================================================
+RECORDATORIO
+============================================================
+
+Revisa el deploy en Railway: este push NO trae migraciones (solo
+código). Tras el deploy, verifica el paso 1 (bitácora con tu hora
+local) directamente en producción.

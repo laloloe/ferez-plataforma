@@ -9,15 +9,10 @@ const { configurada } = require('../lib/db');
 const { leerConfiguracion } = require('../lib/configuracion');
 const constancia = require('../servicios/constancia');
 const { escaparHTML } = require('../lib/html');
+const { formatearFecha } = require('../lib/fechas'); // hora local (ORDEN 11)
 
 const router = express.Router();
 
-function formatearFecha(valor) {
-  if (!valor) return '—';
-  const fecha = valor instanceof Date ? valor : new Date(valor);
-  const dos = (n) => String(n).padStart(2, '0');
-  return `${dos(fecha.getDate())}/${dos(fecha.getMonth() + 1)}/${fecha.getFullYear()} ${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
-}
 
 function pagina(cuerpo) {
   return `<!DOCTYPE html>

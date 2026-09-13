@@ -19,6 +19,7 @@ const usuarios = require('../servicios/usuarios');
 const reinicio = require('../servicios/reinicio');
 const importacionCorreo = require('../servicios/importacion-correo');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
+const { formatearFecha } = require('../lib/fechas'); // hora local (ORDEN 11)
 
 const router = express.Router();
 const subida = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -449,12 +450,6 @@ router.use(require('./admin-sellado'));
 router.use(require('./admin-usuarios'));
 router.use(require('./admin-remitentes'));
 
-function formatearFecha(valor) {
-  if (!valor) return '—';
-  const fecha = valor instanceof Date ? valor : new Date(valor);
-  const dosDigitos = (n) => String(n).padStart(2, '0');
-  return `${fecha.getFullYear()}-${dosDigitos(fecha.getMonth() + 1)}-${dosDigitos(fecha.getDate())} ${dosDigitos(fecha.getHours())}:${dosDigitos(fecha.getMinutes())}`;
-}
 
 // Manejo de errores del panel
 router.use((err, req, res, next) => { // eslint-disable-line no-unused-vars

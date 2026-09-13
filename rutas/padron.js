@@ -9,15 +9,10 @@ const padron = require('../servicios/padron');
 const sellado = require('../servicios/sellado');
 const modo = require('../servicios/modo-pruebas');
 const { escaparHTML } = require('../lib/html');
+const { formatearFecha } = require('../lib/fechas'); // hora local (ORDEN 11)
 
 const router = express.Router();
 
-function formatearFecha(valor) {
-  if (!valor) return '—';
-  const fecha = valor instanceof Date ? valor : new Date(valor);
-  const dos = (n) => String(n).padStart(2, '0');
-  return `${dos(fecha.getDate())}/${dos(fecha.getMonth() + 1)}/${fecha.getFullYear()} ${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
-}
 
 function pagina(cuerpo, { franja = '', titulo = 'Padrón de boletos — Gasolineras Ferez' } = {}) {
   return `<!DOCTYPE html>

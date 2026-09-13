@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const PDFDocument = require('pdfkit');
 const { consultar } = require('../lib/db');
 const { leerConfiguracion } = require('../lib/configuracion');
+const { marcaLocal } = require('../lib/fechas');
 const reglas = require('./reglas-boletos');
 const { MOTIVO_PUBLICO_ANULADO } = require('./padron');
 
@@ -20,17 +21,20 @@ function escaparCampoCSV(valor) {
 }
 
 // CSV canónico del padrón completo. Devuelve un Buffer UTF-8 (LF, sin BOM).
+// fecha_emision va en HORA LOCAL (zona_horaria de configuracion, ORDEN 11);
+// el formato es fijo para que el SHA-256 sea reproducible.
 async function generarCSVCanonico() {
+  const config = await leerConfiguracion();
+  const zonaHoraria = config.zona_horaria || 'America/Chihuahua';
   const filas = await consultar(
-    `SELECT b.folio_boleto, DATE_FORMAT(b.fecha_emision, '%Y-%m-%d %H:%i:%s') AS fecha,
-            b.origen, b.estado, e.nombre AS estacion
+    `SELECT b.folio_boleto, b.fecha_emision, b.origen, b.estado, e.nombre AS estacion
      FROM boletos b LEFT JOIN estaciones e ON e.id = b.estacion_id
      ORDER BY b.numero`);
   const lineas = [ENCABEZADO_CSV];
   for (const fila of filas) {
     lineas.push([
       fila.folio_boleto,
-      fila.fecha,
+      marcaLocal(fila.fecha_emision, zonaHoraria),
       fila.origen === 'compra' ? 'Oficina' : (fila.estacion ?? '—'),
       fila.origen === 'compra' ? 'Oficina' : 'Carga',
       fila.estado === 'anulado' ? MOTIVO_PUBLICO_ANULADO : 'Vigente',
@@ -89,6 +93,10 @@ function generarActaPDF({ esPrueba, fechaLocal, zonaHoraria, resumen, sha256 }) 
     doc.moveDown(0.8);
     doc.font('Helvetica').fontSize(11)
       .text(`Fecha y hora del sellado: ${fechaLocal} (hora local, ${zonaHoraria})`, { align: 'center' });
+    doc.moveDown(0.2);
+    doc.font('Helvetica').fontSize(9.5).fillColor('#444444')
+      .text(`Todas las fechas de emisión del archivo CSV están expresadas en hora local (${zonaHoraria}).`, { align: 'center' });
+    doc.fillColor('#000000');
     doc.moveDown(1.2);
 
     const tabla = (titulo, filas) => {

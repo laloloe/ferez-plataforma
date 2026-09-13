@@ -51,6 +51,15 @@ función queda apagada con un aviso al arrancar. El buzón se revisa cada
 
 Sin base de datos configurada el sitio sigue funcionando; registro y panel responden 503.
 
+## Zona horaria (ORDEN 11)
+
+La base de datos guarda UTC. TODO lo que se presenta al humano y TODA regla
+de negocio con fechas (cierre del padrón, plazo D+7, hora límite del archivo
+diario) usa la clave `zona_horaria` de `configuracion` (America/Chihuahua),
+sin depender de la zona del servidor. La utilería central vive en
+`lib/fechas.js`; las fuentes de importación convierten la hora de pared del
+ticket a UTC al guardar.
+
 ## Rutas
 
 - `/` — landing

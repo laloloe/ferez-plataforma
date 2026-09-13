@@ -6,15 +6,10 @@ const express = require('express');
 const { consultar } = require('../lib/db');
 const { enviarTexto } = require('../servicios/whatsapp-api');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
+const { formatearFecha } = require('../lib/fechas'); // hora local (ORDEN 11)
 
 const router = express.Router();
 
-function formatearFecha(valor) {
-  if (!valor) return '—';
-  const fecha = valor instanceof Date ? valor : new Date(valor);
-  const dos = (n) => String(n).padStart(2, '0');
-  return `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())} ${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
-}
 
 router.get('/whatsapp', async (req, res, next) => {
   try {

@@ -84,8 +84,9 @@ async function emitirEnTransaccion(conexion, { emisionId, cantidad, clienteId, v
   return folios;
 }
 
-// Entrada (a): cliente registrado + folio + estación.
-async function reclamarFolio({ telefono, folio, estacionId, actor }) {
+// Entrada (a): cliente registrado + folio + estación. `ahora` es inyectable
+// para probar cierre de padrón y plazos con reloj simulado (ORDEN 11).
+async function reclamarFolio({ telefono, folio, estacionId, actor, ahora = new Date() }) {
   const config = await leerConfiguracion();
   const p = parametrosDelMotor(config);
   // Folio canónico (ORDEN 7): la misma normalización que usan la
@@ -107,7 +108,7 @@ async function reclamarFolio({ telefono, folio, estacionId, actor }) {
   if (!folioLimpio || !estacion) return terminar(rechazo('DATOS_INCOMPLETOS'));
 
   if (await require('./sellado').haySelloReal()) return terminar(rechazo('PADRON_SELLADO'));
-  if (reglas.padronCerrado(p)) return terminar(rechazo('PADRON_CERRADO'));
+  if (reglas.padronCerrado(p, ahora)) return terminar(rechazo('PADRON_CERRADO'));
 
   const telefonoNormalizado = normalizarTelefono(String(telefono ?? ''));
   if (!telefonoNormalizado) return terminar(rechazo('TELEFONO_INVALIDO'));
@@ -125,7 +126,7 @@ async function reclamarFolio({ telefono, folio, estacionId, actor }) {
     [estacion, folioLimpio]);
   if (!venta) return terminar(rechazo('FOLIO_INEXISTENTE'));
   if (venta.estado !== 'normal') return terminar(rechazo('VENTA_CANCELADA'));
-  if (reglas.fueraDePlazo(venta.fecha_hora, p)) return terminar(rechazo('FUERA_DE_PLAZO'));
+  if (reglas.fueraDePlazo(venta.fecha_hora, p, ahora)) return terminar(rechazo('FUERA_DE_PLAZO'));
   if (reglas.formaPagoExcluida(venta.forma_pago, p.formasExcluidas)) return terminar(rechazo('FORMA_PAGO_EXCLUIDA'));
   if (!reglas.productoParticipante(venta.producto, p.productosParticipantes)) return terminar(rechazo('PRODUCTO_NO_PARTICIPANTE'));
 
@@ -155,7 +156,7 @@ async function reclamarFolio({ telefono, folio, estacionId, actor }) {
         await conexion.rollback();
         const [previa] = await consultar(
           'SELECT fecha FROM emisiones WHERE venta_id = ?', [venta.id]);
-        const cuando = previa ? ` el ${new Date(previa.fecha).toISOString().slice(0, 10)}` : '';
+        const cuando = previa ? ` el ${reglas.diaLocal(previa.fecha, p.zonaHoraria)}` : '';
         return terminar({ ...rechazo('FOLIO_YA_RECLAMADO'), mensaje: `Ese folio ya generó boleto${cuando}.` });
       }
       throw err;
@@ -178,7 +179,7 @@ async function reclamarFolio({ telefono, folio, estacionId, actor }) {
 // Entrada (b): boleto de oficina ($70) — nombre, teléfono y número de recibo.
 // SUPUESTO: si el teléfono no está registrado, se da de alta al cliente en el
 // momento (la compra presencial incluye la aceptación del aviso en papel).
-async function emitirBoletoOficina({ nombre, telefono, recibo, actor }) {
+async function emitirBoletoOficina({ nombre, telefono, recibo, actor, ahora = new Date() }) {
   const config = await leerConfiguracion();
   const p = parametrosDelMotor(config);
   const nombreLimpio = String(nombre ?? '').trim();
@@ -196,7 +197,7 @@ async function emitirBoletoOficina({ nombre, telefono, recibo, actor }) {
 
   if (!nombreLimpio || !reciboLimpio) return terminar(rechazo('DATOS_INCOMPLETOS'));
   if (await require('./sellado').haySelloReal()) return terminar(rechazo('PADRON_SELLADO'));
-  if (reglas.padronCerrado(p)) return terminar(rechazo('PADRON_CERRADO'));
+  if (reglas.padronCerrado(p, ahora)) return terminar(rechazo('PADRON_CERRADO'));
 
   const telefonoNormalizado = normalizarTelefono(String(telefono ?? ''));
   if (!telefonoNormalizado) return terminar(rechazo('TELEFONO_INVALIDO'));

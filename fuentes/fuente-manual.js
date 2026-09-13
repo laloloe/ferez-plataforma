@@ -7,6 +7,7 @@
 
 const { parse } = require('csv-parse/sync');
 const { FuenteDeVentas } = require('./fuente-de-ventas');
+const { utcDesdeLocal } = require('../lib/fechas');
 
 const ALIAS_COLUMNAS = {
   folio: ['folio', 'ticket', 'no_ticket', 'numero'],
@@ -43,15 +44,17 @@ function interpretarFecha(texto) {
   return null;
 }
 
+// Las fechas del CSV vienen en hora de pared LOCAL (la de la estación); se
+// convierten al instante UTC que guarda la BD (ORDEN 11), sin depender de
+// la zona del servidor.
 function construirFecha(anio, mes, dia, hora, minuto, segundo) {
-  const fecha = new Date(
-    Number(anio), Number(mes) - 1, Number(dia),
-    Number(hora || 0), Number(minuto || 0), Number(segundo || 0)
-  );
-  if (fecha.getFullYear() !== Number(anio) || fecha.getMonth() !== Number(mes) - 1 || fecha.getDate() !== Number(dia)) {
+  const prueba = new Date(Date.UTC(Number(anio), Number(mes) - 1, Number(dia)));
+  if (prueba.getUTCFullYear() !== Number(anio) || prueba.getUTCMonth() !== Number(mes) - 1 || prueba.getUTCDate() !== Number(dia)) {
     return null; // fecha inválida, ej. 31/02
   }
-  return fecha;
+  const dos = (n) => String(Number(n || 0)).padStart(2, '0');
+  return utcDesdeLocal(
+    `${anio}-${dos(mes)}-${dos(dia)} ${dos(hora)}:${dos(minuto)}:${dos(segundo)}`);
 }
 
 function interpretarNumero(texto) {

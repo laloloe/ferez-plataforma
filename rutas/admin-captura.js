@@ -8,16 +8,12 @@ const { consultar } = require('../lib/db');
 const { normalizarFolio } = require('../servicios/reglas-boletos');
 const { FuenteManual } = require('../fuentes/fuente-manual');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
+const { formatearFecha } = require('../lib/fechas'); // hora local (ORDEN 11)
+const { utcDesdeLocal } = require('../lib/fechas');
 
 const router = express.Router();
 const subida = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-function formatearFecha(valor) {
-  if (!valor) return '—';
-  const fecha = valor instanceof Date ? valor : new Date(valor);
-  const dos = (n) => String(n).padStart(2, '0');
-  return `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())} ${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
-}
 
 async function registrarCapturaEnBitacora({ actor, folio, estacionId, resultado, detalle }) {
   await consultar(
@@ -97,7 +93,12 @@ router.post('/captura', async (req, res, next) => {
     const estacionId = Number(req.body.estacion_id);
     const [estacion] = await consultar('SELECT id, nombre FROM estaciones WHERE id = ? AND activa = 1', [estacionId]);
     const folio = String(req.body.folio ?? '').trim();
-    const fecha = new Date(String(req.body.fecha_hora ?? '').replace(' ', 'T'));
+    // El campo datetime-local trae hora de pared LOCAL; se guarda su
+    // instante UTC (ORDEN 11).
+    const textoFecha = String(req.body.fecha_hora ?? '').replace('T', ' ').trim();
+    const fecha = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(textoFecha)
+      ? utcDesdeLocal(textoFecha)
+      : new Date(NaN);
     const importe = Number(String(req.body.importe ?? '').replace(/[$\s,]/g, ''));
 
     if (!estacion) return render(res, '<p class="msj error">Estación no válida.</p>');

@@ -124,10 +124,11 @@ test('FuenteControlGAS: lee el fixture con la estructura real y aplica las regla
   assert.equal(magna.importe, 1400);
   assert.equal(magna.litros, 40);
   assert.equal(magna.participante, true);
-  // Fecha de la venta = Fecha + Hora (no el turno).
-  assert.equal(magna.fecha_hora.getHours(), 8);
-  assert.equal(magna.fecha_hora.getMinutes(), 15);
-  assert.equal(magna.fecha_hora.getDate(), new Date().getDate());
+  // Fecha de la venta = Fecha + Hora del export (hora de pared LOCAL),
+  // guardada como instante UTC (ORDEN 11): el reloj de pared se conserva.
+  const { marcaLocal } = require('../lib/fechas');
+  assert.equal(marcaLocal(magna.fecha_hora).slice(11, 16), '08:15');
+  assert.equal(marcaLocal(magna.fecha_hora).slice(0, 10), fechaDeHoy().split('/').reverse().join('-'));
 
   assert.equal(diesel.forma_pago, 'credito');
   assert.equal(diesel.cliente_nombre, 'TRANSPORTES SINTETICOS, S.A.');

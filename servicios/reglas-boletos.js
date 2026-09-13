@@ -33,12 +33,25 @@ function padronCerrado({ cierrePadron, zonaHoraria }, ahora = new Date()) {
   return ahoraLocal(zonaHoraria, ahora) >= cierrePadron;
 }
 
-// Plazo de reclamo en días naturales: la venta del día D se puede reclamar
-// hasta el final del día D + dias (fechas comparadas en la zona local; las
-// ventas se registran en hora local de la estación).
+// 'AAAA-MM-DD' local del instante dado (los textos sin zona son UTC: así
+// guarda la base de datos).
+function diaLocal(valor, zonaHoraria) {
+  const texto = String(valor).trim().replace(' ', 'T');
+  const fecha = valor instanceof Date
+    ? valor
+    : new Date(/(Z|[+-]\d{2}:?\d{2})$/.test(texto) ? texto : `${texto}Z`);
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: zonaHoraria, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(fecha);
+}
+
+// Plazo de reclamo en días naturales LOCALES: la venta del día local D se
+// puede reclamar hasta el final del día local D + dias. La BD guarda UTC,
+// así que el día de la venta se calcula en la zona configurada (ORDEN 11):
+// una venta a las 23:30 locales (05:30Z del día siguiente) pertenece al
+// día local en que ocurrió.
 function diasTranscurridos(fechaVenta, zonaHoraria, ahora = new Date()) {
-  const fecha = fechaVenta instanceof Date ? fechaVenta : new Date(String(fechaVenta).replace(' ', 'T'));
-  const diaVenta = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+  const diaVenta = diaLocal(fechaVenta, zonaHoraria);
   const diaHoy = ahoraLocal(zonaHoraria, ahora).slice(0, 10);
   return Math.round((Date.parse(diaHoy + 'T00:00:00Z') - Date.parse(diaVenta + 'T00:00:00Z')) / 86400000);
 }
@@ -100,6 +113,7 @@ module.exports = {
   normalizarTexto,
   calcularCantidadBoletos,
   ahoraLocal,
+  diaLocal,
   padronCerrado,
   diasTranscurridos,
   fueraDePlazo,

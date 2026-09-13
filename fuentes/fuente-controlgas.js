@@ -25,6 +25,7 @@
 const XLSX = require('xlsx');
 const { FuenteDeVentas } = require('./fuente-de-ventas');
 const { normalizarFolio, normalizarTexto } = require('../servicios/reglas-boletos');
+const { utcDesdeLocal } = require('../lib/fechas');
 
 const ENCABEZADOS_REQUERIDOS = ['fecha', 'hora', 'despacho', 'producto', 'importe'];
 
@@ -123,7 +124,11 @@ class FuenteControlGAS extends FuenteDeVentas {
       const fecha = interpretarFecha(valor(fila, 'fecha'));
       if (!fecha) { errores.push(`Fila ${numeroFila}: fecha no reconocida ("${valor(fila, 'fecha')}").`); continue; }
       const hora = interpretarHora(valor(fila, 'hora'));
-      const fechaHora = new Date(fecha.anio, fecha.mes, fecha.dia, hora.h, hora.m, hora.s);
+      // El export trae hora de pared LOCAL de la estación; se guarda el
+      // instante UTC equivalente (ORDEN 11).
+      const dos = (n) => String(n).padStart(2, '0');
+      const fechaHora = utcDesdeLocal(
+        `${fecha.anio}-${dos(fecha.mes + 1)}-${dos(fecha.dia)} ${dos(hora.h)}:${dos(hora.m)}:${dos(hora.s)}`);
 
       const producto = String(valor(fila, 'producto') ?? '').trim() || null;
       const participante = producto

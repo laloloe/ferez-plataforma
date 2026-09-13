@@ -23,6 +23,7 @@ const { leerConfiguracion } = require('../lib/configuracion');
 const { FuenteControlGAS } = require('../fuentes/fuente-controlgas');
 const { importarVentas } = require('./importar-ventas');
 const reglas = require('./reglas-boletos');
+const fechas = require('../lib/fechas');
 
 const TAMANO_MAXIMO_ADJUNTO = 10 * 1024 * 1024; // 10 MB
 
@@ -246,19 +247,25 @@ function fechaLocal(zonaHoraria, dias = 0, ahora = new Date()) {
   }).format(base);
 }
 
-// Estaciones con espera_archivo_diario=1 sin ventas del día anterior,
-// una vez pasada la hora límite local. Devuelve [{id, nombre}].
+// Estaciones con espera_archivo_diario=1 sin ventas del día LOCAL anterior,
+// una vez pasada la hora límite local. La BD guarda UTC, así que el "día de
+// ayer" se traduce a un rango de instantes UTC (ORDEN 11): una venta de las
+// 23:30 locales (05:30Z del día siguiente) cuenta para su día local.
 async function estacionesConArchivoFaltante(config, ahora = new Date()) {
   const zonaHoraria = config.zona_horaria || 'America/Chihuahua';
   const horaLimite = String(config.hora_limite_archivo ?? '10:00');
   const horaLocal = reglas.ahoraLocal(zonaHoraria, ahora).slice(11, 16);
   if (horaLocal < horaLimite) return [];
   const ayer = fechaLocal(zonaHoraria, -1, ahora);
+  const hoy = fechaLocal(zonaHoraria, 0, ahora);
+  const desde = fechas.utcSQL(fechas.utcDesdeLocal(`${ayer} 00:00`, zonaHoraria));
+  const hasta = fechas.utcSQL(fechas.utcDesdeLocal(`${hoy} 00:00`, zonaHoraria));
   return consultar(
     `SELECT e.id, e.nombre FROM estaciones e
      WHERE e.activa = 1 AND e.espera_archivo_diario = 1
-       AND NOT EXISTS (SELECT 1 FROM ventas v WHERE v.estacion_id = e.id AND DATE(v.fecha_hora) = ?)
-     ORDER BY e.id`, [ayer]);
+       AND NOT EXISTS (SELECT 1 FROM ventas v
+                       WHERE v.estacion_id = e.id AND v.fecha_hora >= ? AND v.fecha_hora < ?)
+     ORDER BY e.id`, [desde, hasta]);
 }
 
 // Asienta la alerta en bitácora UNA vez al día por estación.

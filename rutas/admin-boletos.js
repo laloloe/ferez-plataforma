@@ -8,15 +8,10 @@ const { normalizarTelefono } = require('../lib/telefono');
 const { leerConfiguracion } = require('../lib/configuracion');
 const motor = require('../servicios/motor-boletos');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
+const { formatearFecha } = require('../lib/fechas'); // hora local (ORDEN 11)
 
 const router = express.Router();
 
-function formatearFecha(valor) {
-  if (!valor) return '—';
-  const fecha = valor instanceof Date ? valor : new Date(valor);
-  const dos = (n) => String(n).padStart(2, '0');
-  return `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())} ${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
-}
 
 const ETIQUETA_ESTADO = { vigente: 'VIGENTE', anulado: 'ANULADO' };
 
