@@ -81,7 +81,7 @@ footer a{color:#C9CEC6}
 <main>
 ${cuerpo}
 </main>
-<footer>Estación de Servicio Ferez, S.A. de C.V. · <a href="/aviso-privacidad">Aviso de privacidad</a></footer>
+<footer>Servicio Gasolinero Del Campo, S.A. de C.V. · <a href="/aviso-privacidad">Aviso de privacidad</a></footer>
 </body>
 </html>`;
 }

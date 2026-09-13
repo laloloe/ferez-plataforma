@@ -82,7 +82,7 @@ footer a{color:#C9CEC6}
 <body>
 ${franja}<header class="nav"><div class="wrap"><a class="brand" href="/" aria-label="Gasolineras Ferez, inicio"><img src="/logos/ferez-blanco.png" alt="FEREZ" style="height:40px;width:auto;display:block"></a></div></header>
 ${cuerpo}
-<footer>Estación de Servicio Ferez, S.A. de C.V. · <a href="/aviso-privacidad">Aviso de privacidad</a></footer>
+<footer>Servicio Gasolinero Del Campo, S.A. de C.V. · <a href="/aviso-privacidad">Aviso de privacidad</a></footer>
 </body>
 </html>`;
 }
