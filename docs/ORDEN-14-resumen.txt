@@ -1,0 +1,112 @@
+ORDEN 14 — RESUMEN DE ENTREGA
+Padrón privado: buscador individual + sellado ante notario
+111 pruebas en verde (7 nuevas).
+
+DECISIÓN IMPLEMENTADA
+  El padrón completo NO se publica en línea: el contador y la lista
+  revelan la venta diaria a la competencia. En línea quedan la
+  verificación individual y la huella digital; el padrón íntegro se
+  deposita ante notario público e inspector de la SEGOB.
+
+============================================================
+LO CAMBIADO
+============================================================
+
+/boletos (pública)
+  - Público SIN sesión: título "Verifica tu boleto", explicación
+    breve y el buscador de siempre (SF27-… o teléfono a 10 dígitos)
+    con resultados individuales enmascarados. Texto nuevo: "Cada
+    boleto es verificable aquí en todo momento. El padrón completo se
+    sella y deposita ante notario público e inspector de la
+    Secretaría de Gobernación antes del sorteo."
+  - Se eliminaron del público el contador grande y la lista completa;
+    el HTML público no contiene el total de boletos en ninguna parte
+    (probado automáticamente).
+  - Con sesión del panel (administrador u operador): el contador y la
+    lista completa paginada SIGUEN en esta misma página, marcada como
+    vista de operación.
+
+/boletos/sellado (pública)
+  - Antes del sellado real: explica el mecanismo (cierre, depósito
+    ante notario e inspector, huella digital) sin cifras.
+  - Después del sellado real: fecha y hora del sellado, SHA-256 en
+    grande, leyenda del depósito notarial e invitación a cotejar el
+    padrón en la notaría. SIN descarga del CSV y SIN total de boletos
+    para el público; los datos internos del depósito tampoco se
+    muestran.
+  - Con sesión del panel: además, total, datos del depósito, descarga
+    del CSV y del acta, e instrucciones de verificación del hash. Las
+    URLs de descarga responden 404 a cualquier visitante sin sesión.
+
+SELLADO (sin cambios de fondo)
+  - Sellado real y simulacros siguen generando CSV canónico + acta +
+    hash, inmutables en BD; solo cambió quién descarga.
+  - El acta ahora asienta SIEMPRE el renglón del depósito: "Notario
+    público: ___" y "Acta / fe de hechos número: ___". El
+    administrador captura ambos campos al sellar en /admin/sellado
+    (opcionales en simulacros; si van vacíos, el renglón queda en
+    blanco para llenarse a mano). Los datos notariales no alteran el
+    CSV ni su huella (probado). Migración 015: dos columnas nuevas en
+    la tabla sellos.
+
+LANDING (sección #sorteo)
+  - Línea de transparencia nueva: "Tu boleto es verificable en todo
+    momento; el padrón se sella ante notario público e inspector de
+    la Secretaría de Gobernación antes del sorteo", con liga a
+    /boletos/sellado.
+
+MODO EXHIBICIÓN
+  - Mismas reglas: la familia sin sesión ve el buscador con su franja
+    ámbar, nunca la lista ni el contador (probado).
+
+============================================================
+CÓMO PROBAR EN 5 PASOS
+============================================================
+
+1. En ventana privada (sin sesión) abre ferez.mx/boletos: debe verse
+   "Verifica tu boleto" con el buscador, SIN contador y SIN lista.
+   Busca un boleto real por número y por teléfono: el resultado sale
+   enmascarado.
+
+2. Inicia sesión en /admin y recarga /boletos: aparecen el contador
+   grande y la lista completa paginada (vista de operación).
+
+3. Sin sesión, abre /boletos/sellado: explica el depósito notarial
+   sin cifras y sin botones de descarga. Intenta la URL directa
+   /boletos/sellado/padron-sf27.csv: debe responder "No disponible".
+
+4. En /admin/sellado ejecuta un simulacro llenando "Notario público"
+   y "Acta / fe de hechos": descarga el acta y verifica el renglón
+   del depósito con esos datos; repite sin llenarlos y verifica el
+   renglón en blanco.
+
+5. En la landing (modo exhibición), baja a la sección del sorteo: la
+   línea de transparencia dice "Tu boleto es verificable en todo
+   momento; el padrón se sella ante notario…" y lleva al sellado.
+
+============================================================
+SUPUESTOS
+============================================================
+
+- "Sesión del panel" = administrador u operador (y la credencial
+  provisional mientras siga habilitada): ambos ven contador, lista y
+  descargas; el público jamás.
+- La huella SHA-256 sí es pública tras el sellado real: es el
+  compromiso verificable sin revelar cifras; quien quiera cotejar el
+  padrón íntegro lo hace en la notaría.
+- El nombre del notario y el número de acta se muestran solo a
+  sesiones del panel y en el acta PDF; la página pública lleva la
+  leyenda genérica del depósito.
+- El banner público de "padrón sellado" en /boletos se conserva (sin
+  cifras); la nota legal pública ya no menciona una "lista" en línea.
+- Los simulacros previos no se tocan; el renglón notarial aplica a
+  las actas generadas de aquí en adelante.
+
+============================================================
+RECORDATORIO
+============================================================
+
+Revisa el deploy en Railway: al arrancar aplicará la migración
+015_padron_privado.sql (dos ADD COLUMN en la tabla sellos — sin
+riesgo para TiDB). Después verifica el paso 1 y el paso 3 en
+producción sin sesión.

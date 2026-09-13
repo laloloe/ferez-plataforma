@@ -103,7 +103,7 @@ test('clave encendida sin permiso: todo visible al público con banners', { skip
   for (const destino of ['/registro', '/boletos', '/constancia', '/boletos/sellado', '/bases']) {
     assert.equal(landing.texto.includes(`href="${destino}"`), true, `botón a ${destino}`);
   }
-  assert.equal(landing.texto.includes('nadie puede alterar los boletos'), true, 'línea de transparencia');
+  assert.equal(landing.texto.includes('verificable en todo momento'), true, 'línea de transparencia');
   assert.equal(landing.texto.includes('wa.me'), false, 'sin botón de WhatsApp con la clave vacía');
   assert.equal(landing.texto.includes('%%WHATSAPP_LINK%%'), false, 'sin marcador residual');
   // La tarjeta de Recompensas ya no duplica: enlaza a #sorteo.

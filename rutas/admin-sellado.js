@@ -42,17 +42,23 @@ async function render(res, avisoHTML = '') {
       Público en <a href="/boletos/sellado">/boletos/sellado</a>.</p>` : ''}
 
     <h2>Simulacro de sellado</h2>
-    <p>Genera CSV y acta marcados "PRUEBA — SIN VALIDEZ". No congela nada y puede repetirse cuantas veces se quiera.</p>
+    <p>Genera CSV y acta marcados "PRUEBA — SIN VALIDEZ". No congela nada y puede repetirse cuantas veces se quiera.
+    Los datos notariales son opcionales en el simulacro.</p>
     <form class="linea" method="post" action="/admin/sellado/simulacro">
+      <div><label>Notario público (opcional)</label><input type="text" name="notario" maxlength="150"></div>
+      <div><label>Acta / fe de hechos (opcional)</label><input type="text" name="acta_notarial" maxlength="100"></div>
       <button type="submit">Ejecutar simulacro</button>
     </form>
 
     ${real ? '' : `
     <h2>Sellado real</h2>
     <p><strong>Único e irreversible.</strong> Solo procede con el padrón cerrado. Congela el padrón:
-    después no se emite ni se anula nada.</p>
+    después no se emite ni se anula nada. Captura aquí el depósito notarial; el acta asienta el
+    renglón (en blanco si aún no tienes el número).</p>
     <form class="linea" method="post" action="/admin/sellado/real"
           onsubmit="return confirm('SEGUNDA CONFIRMACIÓN: el sellado real es único e irreversible. ¿Ejecutarlo ahora?')">
+      <div><label>Notario público</label><input type="text" name="notario" maxlength="150" placeholder="Nombre y número de notaría"></div>
+      <div><label>Acta / fe de hechos</label><input type="text" name="acta_notarial" maxlength="100"></div>
       <div><label>Escribe SELLAR para confirmar</label>
       <input type="text" name="confirmacion" autocomplete="off" placeholder="SELLAR" required></div>
       <button type="submit">Ejecutar sellado real</button>
@@ -78,7 +84,8 @@ router.get('/sellado', async (req, res, next) => {
 
 router.post('/sellado/simulacro', async (req, res, next) => {
   try {
-    const resultado = await sellado.ejecutarSellado('simulacro', `admin:${req.actor}`);
+    const resultado = await sellado.ejecutarSellado('simulacro', `admin:${req.actor}`,
+      { notario: req.body.notario, actaNotarial: req.body.acta_notarial });
     await render(res, `<p class="msj ok">Simulacro #${resultado.id} generado: ${resultado.total} boletos,
       SHA-256 <code>${escaparHTML(resultado.sha256)}</code>.
       <a href="/admin/sellado/descarga?id=${resultado.id}&archivo=csv">Descargar CSV</a> ·
@@ -91,7 +98,8 @@ router.post('/sellado/real', async (req, res, next) => {
     if (String(req.body.confirmacion ?? '').trim().toUpperCase() !== 'SELLAR') {
       return render(res, '<p class="msj error">Confirmación incorrecta: escribe SELLAR para ejecutar el sellado real.</p>');
     }
-    const resultado = await sellado.ejecutarSellado('real', `admin:${req.actor}`);
+    const resultado = await sellado.ejecutarSellado('real', `admin:${req.actor}`,
+      { notario: req.body.notario, actaNotarial: req.body.acta_notarial });
     if (!resultado.ok && resultado.mensaje) {
       return render(res, `<p class="msj error">${escaparHTML(resultado.mensaje)}</p>`);
     }

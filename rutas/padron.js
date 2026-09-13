@@ -133,15 +133,18 @@ router.get('/boletos', async (req, res, next) => {
         <p>El padrón público estará disponible muy pronto. Vuelve a intentarlo más tarde.</p></main>`));
     }
 
+    // Padrón privado (ORDEN 14): el contador y la lista completa revelan la
+    // venta diaria; solo sesiones del panel los ven. El público verifica
+    // boletos uno por uno.
+    const sesionPanel = await modo.sesionDePanel(req);
     const config = await leerConfiguracion();
     const cerrado = reglas.padronCerrado({
       cierrePadron: config.cierre_padron,
       zonaHoraria: config.zona_horaria || 'America/Chihuahua',
     });
-    const vigentes = await padron.contadorVigentes();
     const selloRealInfo = await sellado.selloReal();
 
-    // Búsqueda
+    // Búsqueda (pública: resultados individuales enmascarados)
     const textoBusqueda = String(req.query.buscar ?? '').trim();
     let resultadoHTML = '';
     if (textoBusqueda) {
@@ -162,27 +165,53 @@ router.get('/boletos', async (req, res, next) => {
       }
     }
 
-    // Lista completa paginada
-    const { total, paginaActual, totalPaginas, boletos } = await (async () => {
-      const r = await padron.listarPadron(Number(req.query.pagina) || 1);
-      return { total: r.total, paginaActual: r.pagina, totalPaginas: r.totalPaginas, boletos: r.boletos };
-    })();
-
-    const enlacePagina = (n, etiqueta) =>
-      `<a href="/boletos?pagina=${n}${textoBusqueda ? `&buscar=${encodeURIComponent(textoBusqueda)}` : ''}#lista">${etiqueta}</a>`;
-
-    res.send(pagina(`
-      <section class="portada">
-        <h1>Padrón público del sorteo</h1>
-        <div class="contador">${vigentes.toLocaleString('es-MX')}</div>
-        <div class="contador-nota">boletos participando</div>
-        <p>Cada carga que alcanza el monto genera boletos. Aquí está la lista completa:
-        puedes contar, comparar y encontrar el tuyo.</p>
+    const avisos = `
         ${cerrado ? `<div class="cerrado">El padrón cerró el ${escaparHTML(config.cierre_padron)} (hora local).
           Ya no se emiten boletos nuevos; la lista queda tal como se selló.</div>` : ''}
         ${selloRealInfo ? `<div class="sellado-banner">El padrón fue sellado el ${escaparHTML(selloRealInfo.fecha_local)}.
-          <a href="/boletos/sellado">Verifica aquí la lista sellada y su huella digital</a>.</div>` : ''}
-      </section>
+          <a href="/boletos/sellado">Conoce aquí el sellado y su huella digital</a>.</div>` : ''}`;
+
+    // Portada: contador solo con sesión del panel.
+    let portada;
+    if (sesionPanel) {
+      const vigentes = await padron.contadorVigentes();
+      portada = `
+      <section class="portada">
+        <h1>Padrón del sorteo</h1>
+        <div class="contador">${vigentes.toLocaleString('es-MX')}</div>
+        <div class="contador-nota">boletos participando</div>
+        <p>Vista de operación (sesión del panel): el público solo ve el buscador individual.</p>
+        ${avisos}
+      </section>`;
+    } else {
+      portada = `
+      <section class="portada">
+        <h1>Verifica tu boleto</h1>
+        <p>Cada boleto es verificable aquí en todo momento. El padrón completo se sella y
+        deposita ante notario público e inspector de la Secretaría de Gobernación antes
+        del sorteo.</p>
+        ${avisos}
+      </section>`;
+    }
+
+    // Lista completa: SOLO con sesión del panel.
+    let listaHTML = '';
+    if (sesionPanel) {
+      const r = await padron.listarPadron(Number(req.query.pagina) || 1);
+      const enlacePagina = (n, etiqueta) =>
+        `<a href="/boletos?pagina=${n}${textoBusqueda ? `&buscar=${encodeURIComponent(textoBusqueda)}` : ''}#lista">${etiqueta}</a>`;
+      listaHTML = `
+        <h2 id="lista">Lista completa (${r.total.toLocaleString('es-MX')} boletos)</h2>
+        ${r.boletos.length ? tablaBoletos(r.boletos, false) : '<p class="vacio">Aún no hay boletos emitidos.</p>'}
+        <div class="pie-lista">
+          <span>${r.pagina > 1 ? enlacePagina(r.pagina - 1, '← Anterior') : ''}</span>
+          <span>Página ${r.pagina} de ${r.totalPaginas}</span>
+          <span>${r.pagina < r.totalPaginas ? enlacePagina(r.pagina + 1, 'Siguiente →') : ''}</span>
+        </div>`;
+    }
+
+    res.send(pagina(`
+      ${portada}
       <main>
         <h2>Busca tu boleto</h2>
         <form class="buscador" method="get" action="/boletos#resultado">
@@ -197,18 +226,11 @@ router.get('/boletos', async (req, res, next) => {
             de tu boleto</a> con todas las leyendas del permiso.</p>`
           : ''}
         <div id="resultado">${resultadoHTML}</div>
-
-        <h2 id="lista">Lista completa (${total.toLocaleString('es-MX')} boletos)</h2>
-        ${boletos.length ? tablaBoletos(boletos, false) : '<p class="vacio">Aún no hay boletos emitidos.</p>'}
-        <div class="pie-lista">
-          <span>${paginaActual > 1 ? enlacePagina(paginaActual - 1, '← Anterior') : ''}</span>
-          <span>Página ${paginaActual} de ${totalPaginas}</span>
-          <span>${paginaActual < totalPaginas ? enlacePagina(paginaActual + 1, 'Siguiente →') : ''}</span>
-        </div>
-
-        <p class="nota-legal">Los boletos anulados permanecen en la lista con la leyenda
-        "${escaparHTML(padron.MOTIVO_PUBLICO_ANULADO)}" y su número no se reutiliza. El sorteo se realiza de forma
-        física y presencial ante notario; esta plataforma únicamente emite boletos y resguarda el padrón.</p>
+        ${listaHTML}
+        <p class="nota-legal">Los boletos anulados se muestran con la leyenda
+        "${escaparHTML(padron.MOTIVO_PUBLICO_ANULADO)}" y su número no se reutiliza. El padrón completo se
+        sella y deposita ante notario público e inspector de la Secretaría de Gobernación; el sorteo se
+        realiza de forma física y presencial ante notario.</p>
       </main>`, { franja }));
   } catch (err) { next(err); }
 });
@@ -245,56 +267,70 @@ router.get('/boletos/sellado', async (req, res, next) => {
     if (!configurada()) {
       return res.status(503).send(pagina('<main><h2>Página no disponible por el momento</h2></main>'));
     }
+    const sesionPanel = await modo.sesionDePanel(req);
     const sello = await sellado.selloReal();
+
     if (!sello) {
       const config = await leerConfiguracion();
       return res.send(pagina(`
         <section class="portada">
           <h1>Sellado del padrón</h1>
-          <p>La lista de boletos se congelará antes del sorteo y aquí quedará su evidencia.</p>
+          <p>Antes del sorteo, el padrón se congela y se deposita ante notario.</p>
         </section>
         <main>
-          <h2>Qué es el sellado</h2>
-          <p>Al cerrar el padrón (${escaparHTML(config.cierre_padron)}, hora local) la lista completa de boletos
-          se congela: se genera un archivo con todos los boletos, se calcula su huella digital (SHA-256)
-          y se publica junto con un acta. La lista se imprime y se entrega antes del sorteo.</p>
-          <p>Desde ese momento cualquier persona podrá descargar el archivo, calcular la huella en su propia
-          computadora y comprobar que la lista no fue alterada. El sorteo se realiza de forma física y
-          presencial ante notario; esta plataforma solo emite boletos y resguarda el padrón.</p>
-          <p><a href="/boletos">Volver al padrón</a></p>
+          <h2>Cómo funciona</h2>
+          <p>Al cerrar el padrón (${escaparHTML(config.cierre_padron)}, hora local) la lista completa de
+          boletos se congela y se calcula su huella digital (SHA-256), que quedará publicada aquí.</p>
+          <p>El padrón íntegro se deposita ante notario público y ante el inspector de la Secretaría de
+          Gobernación. Cualquier participante puede verificar su boleto en esta página en todo momento,
+          y cotejar el padrón depositado en la notaría. El sorteo se realiza de forma física y presencial
+          ante notario.</p>
+          <p><a href="/boletos">Verificar mi boleto</a></p>
         </main>`, { franja }));
     }
-    res.send(pagina(`
-      <section class="portada">
-        <h1>Padrón sellado</h1>
-        <p>Sellado el ${escaparHTML(sello.fecha_local)} (hora local) con ${Number(sello.total).toLocaleString('es-MX')} boletos.
-        La lista es final: descárgala y comprueba su huella.</p>
-      </section>
-      <main>
-        <h2>Huella digital (SHA-256)</h2>
-        <p class="hash">${escaparHTML(sello.sha256)}</p>
+
+    // Con sellado real: la huella es pública; el archivo, solo para el panel.
+    const descargasHTML = sesionPanel ? `
+        <h2>Archivos del sellado (sesión del panel)</h2>
+        <p>Sellado con ${Number(sello.total).toLocaleString('es-MX')} boletos
+        ${sello.notario ? `— depósito: ${escaparHTML(sello.notario)}${sello.acta_notarial ? `, acta ${escaparHTML(sello.acta_notarial)}` : ''}` : ''}.</p>
         <div class="descargas">
           <a href="/boletos/sellado/padron-sf27.csv">Descargar padrón (CSV)</a>
           <a href="/boletos/sellado/acta-sf27.pdf">Descargar acta (PDF)</a>
         </div>
-        <h2>Cómo verificar tu descarga</h2>
-        <p>Calcula la huella del archivo descargado y compárala con la de arriba. Si coinciden,
-        tu copia es idéntica a la lista sellada.</p>
+        <h2>Cómo verificar la descarga</h2>
         <div class="verificar">
           <strong>Windows (Símbolo del sistema):</strong>
           <code>certutil -hashfile padron-sf27.csv SHA256</code>
           <strong>Mac o Linux (Terminal):</strong>
           <code>shasum -a 256 padron-sf27.csv</code>
-        </div>
-        <p class="nota-legal">El acta incluye los totales por estación, origen y estado, y esta misma huella.
-        El sorteo se realiza de forma física y presencial ante notario.</p>
-        <p><a href="/boletos">Volver al padrón</a></p>
+        </div>` : '';
+
+    res.send(pagina(`
+      <section class="portada">
+        <h1>Padrón sellado</h1>
+        <p>El padrón quedó sellado el ${escaparHTML(sello.fecha_local)} (hora local) y depositado
+        ante notario público e inspector de la Secretaría de Gobernación. La lista es final.</p>
+      </section>
+      <main>
+        <h2>Huella digital (SHA-256)</h2>
+        <p class="hash">${escaparHTML(sello.sha256)}</p>
+        <p>Esta huella identifica de forma única la lista sellada: el padrón depositado en la notaría
+        produce exactamente esta misma huella. Puedes acudir a la notaría a cotejarla y verificar ahí
+        el padrón íntegro; tu boleto, además, es <a href="/boletos">verificable aquí en todo momento</a>.</p>
+        ${descargasHTML}
+        <p class="nota-legal">El sorteo se realiza de forma física y presencial ante notario.</p>
+        <p><a href="/boletos">Volver a la verificación de boletos</a></p>
       </main>`, { franja }));
   } catch (err) { next(err); }
 });
 
-// Los artefactos del sellado real se sirven tal cual se generaron.
-async function servirArchivoSellado(res, archivo) {
+// Los artefactos del sellado real se sirven tal cual se generaron,
+// SOLO a sesiones del panel (ORDEN 14: el padrón completo no es público).
+async function servirArchivoSellado(req, res, archivo) {
+  if (!(await modo.sesionDePanel(req))) {
+    return res.status(404).send('No disponible.');
+  }
   const info = await sellado.selloReal();
   if (!info) return res.status(404).send('El padrón aún no ha sido sellado.');
   const files = await sellado.archivosDeSello(info.id);
@@ -309,10 +345,10 @@ async function servirArchivoSellado(res, archivo) {
 }
 
 router.get('/boletos/sellado/padron-sf27.csv', async (req, res, next) => {
-  try { await servirArchivoSellado(res, 'csv'); } catch (err) { next(err); }
+  try { await servirArchivoSellado(req, res, 'csv'); } catch (err) { next(err); }
 });
 router.get('/boletos/sellado/acta-sf27.pdf', async (req, res, next) => {
-  try { await servirArchivoSellado(res, 'acta'); } catch (err) { next(err); }
+  try { await servirArchivoSellado(req, res, 'acta'); } catch (err) { next(err); }
 });
 
 module.exports = router;

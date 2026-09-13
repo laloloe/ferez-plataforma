@@ -65,7 +65,7 @@ ticket a UTC al guardar.
 - `/` — landing
 - `/registro` — alta de participantes (nombre, teléfono E.164, aceptación del aviso)
 - `/aviso-privacidad` — aviso de privacidad (LFPDPPP)
-- `/boletos` — padrón público: contador, buscador (boleto o teléfono) y lista completa paginada
+- `/boletos` — verificación individual de boletos (padrón privado, ORDEN 14: contador y lista completa solo con sesión del panel; el padrón íntegro se deposita ante notario e inspector de la SEGOB)
 - `/boletos/sellado` — sellado del padrón: explicación antes; CSV, acta y SHA-256 después
 - `/admin` — panel con usuarios individuales y roles (administrador / operador): resumen, participantes, importación CSV
 - `/admin/acceso` — pantalla de acceso (correo y contraseña; sesión por cookie firmada)

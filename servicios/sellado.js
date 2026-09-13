@@ -66,7 +66,7 @@ async function calcularResumen() {
 
 // Acta PDF (1-3 páginas). Sin datos personales. compress:false para poder
 // verificar en pruebas que no contiene teléfonos ni nombres.
-function generarActaPDF({ esPrueba, fechaLocal, zonaHoraria, resumen, sha256 }) {
+function generarActaPDF({ esPrueba, fechaLocal, zonaHoraria, resumen, sha256, notario, actaNotarial }) {
   return new Promise((resolver, rechazar) => {
     const doc = new PDFDocument({ size: 'LETTER', margin: 60, compress: false });
     const pedazos = [];
@@ -126,13 +126,30 @@ function generarActaPDF({ esPrueba, fechaLocal, zonaHoraria, resumen, sha256 }) 
       'Cómo verificarlo: descargue el archivo CSV del padrón y calcule su huella SHA-256 ' +
       '(en Windows: certutil -hashfile archivo SHA256; en Mac o Linux: shasum -a 256 archivo). ' +
       'Si la huella coincide con la impresa en esta acta, la lista no fue alterada.');
+    doc.moveDown(1);
+
+    // Depósito notarial (ORDEN 14): el renglón se asienta siempre; si los
+    // datos no se capturaron, queda en blanco para llenarse a mano.
+    doc.font('Helvetica-Bold').fontSize(12).text('Depósito del padrón');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(11);
+    doc.text(`Notario público: ${notario || '________________________________________'}`, { indent: 16 });
+    doc.text(`Acta / fe de hechos número: ${actaNotarial || '____________________'}`, { indent: 16 });
+    doc.moveDown(0.4);
+    doc.font('Helvetica').fontSize(10.5).text(
+      'El padrón íntegro se deposita ante notario público y ante el inspector de la ' +
+      'Secretaría de Gobernación; en línea permanecen la verificación individual de cada ' +
+      'boleto y esta huella digital.');
     doc.end();
   });
 }
 
 // Ejecuta un sellado. tipo: 'simulacro' (repetible, no congela nada) o
-// 'real' (una sola vez, solo con el padrón cerrado).
-async function ejecutarSellado(tipo, actor) {
+// 'real' (una sola vez, solo con el padrón cerrado). datosNotariales:
+// { notario, actaNotarial } — capturados al sellar; opcionales en simulacros.
+async function ejecutarSellado(tipo, actor, datosNotariales = {}) {
+  const notario = String(datosNotariales.notario ?? '').trim() || null;
+  const actaNotarial = String(datosNotariales.actaNotarial ?? '').trim() || null;
   const config = await leerConfiguracion();
   const zonaHoraria = config.zona_horaria || 'America/Chihuahua';
 
@@ -151,16 +168,16 @@ async function ejecutarSellado(tipo, actor) {
   const sha256 = crypto.createHash('sha256').update(csv).digest('hex');
   const resumen = await calcularResumen();
   const acta = await generarActaPDF({
-    esPrueba: tipo === 'simulacro', fechaLocal, zonaHoraria, resumen, sha256,
+    esPrueba: tipo === 'simulacro', fechaLocal, zonaHoraria, resumen, sha256, notario, actaNotarial,
   });
 
   let selloId;
   try {
     const filas = await consultar(
-      `INSERT INTO sellos (tipo, es_real, fecha_local, actor, sha256, total, resumen, csv, acta)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO sellos (tipo, es_real, fecha_local, actor, sha256, total, resumen, csv, acta, notario, acta_notarial)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [tipo, tipo === 'real' ? 1 : null, fechaLocal, actor, sha256, resumen.total,
-       JSON.stringify(resumen), csv, acta]);
+       JSON.stringify(resumen), csv, acta, notario, actaNotarial]);
     selloId = filas.insertId;
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
@@ -183,7 +200,7 @@ let cacheSelloReal = null;
 async function selloReal() {
   if (cacheSelloReal) return cacheSelloReal;
   const [sello] = await consultar(
-    `SELECT id, fecha_local, actor, sha256, total, resumen FROM sellos WHERE es_real = 1`);
+    `SELECT id, fecha_local, actor, sha256, total, resumen, notario, acta_notarial FROM sellos WHERE es_real = 1`);
   if (sello) cacheSelloReal = { ...sello, resumen: JSON.parse(sello.resumen) };
   return cacheSelloReal;
 }
