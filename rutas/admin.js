@@ -446,6 +446,7 @@ router.use(require('./admin-parametros'));
 router.use(require('./admin-boletos'));
 router.use(require('./admin-whatsapp'));
 router.use(require('./admin-captura'));
+router.use(require('./admin-credito'));
 router.use(require('./admin-sellado'));
 router.use(require('./admin-usuarios'));
 router.use(require('./admin-remitentes'));

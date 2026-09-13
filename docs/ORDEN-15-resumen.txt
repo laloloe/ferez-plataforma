@@ -1,0 +1,117 @@
+ORDEN 15 — RESUMEN DE ENTREGA
+Titularidad de boletos en ventas a crédito (flotillas)
+118 pruebas en verde (7 nuevas).
+
+============================================================
+RUTAS Y CLAVES NUEVAS
+============================================================
+
+/admin/credito (administrador y operador; también en el menú del panel)
+  - Cuentas de crédito: código (el mismo de la columna Código del
+    export), nombre del cliente, teléfono del titular a 10 dígitos y
+    estado activo/inactivo. Si el titular no existe como participante,
+    la pantalla lo crea junto con la cuenta (casilla marcada por
+    default).
+  - Detalle por cuenta: lista de TELÉFONOS AUTORIZADOS (choferes),
+    cada uno con su referencia de carta de consentimiento (texto
+    libre, p. ej. "carta 14-oct-2026, archivada en oficina"). Alta y
+    baja desde el panel; todo queda en bitácora (tipo ajuste,
+    resultado CREDITO).
+  - Sección "Códigos vistos en ventas sin cuenta registrada": códigos
+    de crédito del export que aún no tienen cuenta, con su nombre de
+    Cliente y cuántas ventas acumulan, y liga "Dar de alta" con el
+    código y nombre prellenados.
+
+Clave nueva en configuracion:
+  credito_requiere_titular = true (default, editable en /admin/parametros)
+    true  → venta a crédito de cuenta NO registrada se rechaza
+            (CREDITO_SIN_CUENTA) hasta registrar la cuenta.
+    false → se emite a quien reclama (comportamiento anterior).
+
+Migración 016: tablas cuentas_credito y credito_autorizados, columna
+cuenta_credito_id en boletos, y la clave nueva.
+
+============================================================
+REGLA DEL MOTOR (solo ventas a crédito)
+============================================================
+
+- Cuenta registrada y ACTIVA: el boleto se emite ÚNICAMENTE si quien
+  reclama es el titular o un teléfono autorizado. Cualquier otro →
+  CREDITO_NO_AUTORIZADO, texto del bot: "Esta carga pertenece a una
+  cuenta de crédito empresarial y sus boletos corresponden al titular.
+  Si eres el operador del vehículo, pide al titular autorizar tu
+  número en oficinas."
+- Cuenta NO registrada (o inactiva): manda la bandera
+  credito_requiere_titular (arriba). El texto del rechazo: "Esta carga
+  es de una cuenta de crédito. Pide en oficinas de la estación
+  registrar la cuenta para recibir sus boletos."
+- El boleto emitido por regla de crédito guarda su cuenta y se ve en
+  el detalle de /admin/boletos ("Cuenta de crédito: C-26 — ...").
+- Todo rechazo queda en bitácora con el código de cuenta y el
+  teléfono que intentó (probado).
+- Contado y capturas de contado: sin cambios. Capturas manuales
+  marcadas crédito siguen la misma regla (la detección es por forma
+  de pago "crédito", con o sin acento).
+
+============================================================
+CÓMO PROBAR EN 5 PASOS (con el export real del 30-ago)
+============================================================
+
+1. Importa (o confirma importado) el export del 30-ago y abre
+   /admin/credito: en "Códigos vistos sin cuenta" debe aparecer la
+   cuenta de TRANSPORTES EL 26 con su código y cuántas ventas
+   acumula. Pulsa "Dar de alta", pon tu teléfono de prueba como
+   titular y registra la cuenta (deja marcada la casilla para crearlo
+   como participante).
+
+2. Con el teléfono del TITULAR, reclama por el bot el folio de una de
+   esas ventas a crédito: debe emitir boletos. En /admin/boletos abre
+   el detalle: debe decir "Cuenta de crédito: [código] — TRANSPORTES
+   EL 26".
+
+3. Con OTRO teléfono registrado (chofer sin autorizar), reclama otro
+   folio de crédito de la misma cuenta: debe responder el texto de
+   "sus boletos corresponden al titular". Revisa /admin/bitacora: el
+   asiento CREDITO_NO_AUTORIZADO trae la cuenta y el teléfono.
+
+4. En el detalle de la cuenta autoriza ese teléfono con su referencia
+   de carta y reclama de nuevo (otro folio de crédito): ahora emite.
+   Da de baja la autorización y prueba con un tercer folio: vuelve a
+   rechazarse.
+
+5. Reclama un folio de crédito de una cuenta SIN registrar (otro
+   código): debe responder "Pide en oficinas registrar la cuenta".
+   Cambia credito_requiere_titular a false en /admin/parametros,
+   reclama de nuevo y verifica que emite (regrésala a true). Un folio
+   de CONTADO debe emitir siempre, sin ninguna de estas reglas.
+
+============================================================
+SUPUESTOS
+============================================================
+
+- "Tipo = Crédito" se detecta por la forma de pago normalizada
+  ('credito', con o sin acento) — así la marca el importador de la
+  ORDEN 7 y así la escriben las capturas manuales.
+- Una cuenta INACTIVA se trata como no registrada (manda la bandera):
+  desactivarla no libera los boletos al chofer si la bandera está en
+  true.
+- La creación del titular como participante desde /admin/credito
+  asienta el consentimiento como capturado en oficina (igual que un
+  alta presencial); queda en bitácora quién lo creó.
+- Las cuentas de crédito y sus autorizados SOBREVIVEN al Reinicio de
+  arranque (son registro operativo, como los remitentes); los
+  titulares/choferes sí se borran como participantes y deberán
+  re-registrarse.
+- El código de cuenta es único global (no por estación): así viene en
+  el export.
+
+============================================================
+RECORDATORIO
+============================================================
+
+Revisa el deploy en Railway: al arrancar aplicará la migración
+016_credito_flotillas.sql (2 CREATE TABLE, 1 ADD COLUMN y 1 INSERT —
+sin riesgo para TiDB). La bandera nace en true: desde ese momento las
+ventas a crédito sin cuenta registrada se rechazan, así que conviene
+dar de alta las cuentas frecuentes (empezando por TRANSPORTES EL 26)
+en cuanto termine el deploy.

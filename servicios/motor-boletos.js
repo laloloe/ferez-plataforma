@@ -30,6 +30,8 @@ const RECHAZOS = {
   TOPE_ALCANZADO: 'Ya alcanzaste el máximo de boletos permitidos por persona.',
   TELEFONO_INVALIDO: 'El teléfono no tiene un formato válido.',
   RECIBO_DUPLICADO: 'Ese número de recibo ya tiene un boleto emitido.',
+  CREDITO_NO_AUTORIZADO: 'Esta carga pertenece a una cuenta de crédito empresarial y sus boletos corresponden al titular. Si eres el operador del vehículo, pide al titular autorizar tu número en oficinas.',
+  CREDITO_SIN_CUENTA: 'Esta carga es de una cuenta de crédito. Pide en oficinas de la estación registrar la cuenta para recibir sus boletos.',
   DATOS_INCOMPLETOS: 'Faltan datos para emitir el boleto.',
 };
 
@@ -41,6 +43,7 @@ function parametrosDelMotor(config) {
     formasExcluidas: config.formas_pago_excluidas || [],
     diasParaReclamar: config.dias_para_reclamar,
     topePorPersona: config.tope_por_persona,
+    creditoRequiereTitular: config.credito_requiere_titular !== false,
     formatoBoleto: config.formato_boleto,
     cierrePadron: config.cierre_padron,
     zonaHoraria: config.zona_horaria || 'America/Chihuahua',
@@ -65,7 +68,7 @@ function rechazo(codigo, extras = {}) {
 
 // Toma `cantidad` números consecutivos del contador y crea los boletos,
 // todo dentro de la transacción de `conexion`. Devuelve los folios creados.
-async function emitirEnTransaccion(conexion, { emisionId, cantidad, clienteId, ventaId, estacionId, origen, formatoBoleto }) {
+async function emitirEnTransaccion(conexion, { emisionId, cantidad, clienteId, ventaId, estacionId, origen, formatoBoleto, cuentaCreditoId = null }) {
   const [[contador]] = await conexion.query('SELECT siguiente FROM contador_boletos WHERE id = 1 FOR UPDATE');
   const primero = Number(contador.siguiente);
   await conexion.query('UPDATE contador_boletos SET siguiente = ? WHERE id = 1', [primero + cantidad]);
@@ -75,9 +78,9 @@ async function emitirEnTransaccion(conexion, { emisionId, cantidad, clienteId, v
     const numero = primero + i;
     const folioBoleto = reglas.formatearFolioBoleto(formatoBoleto, numero);
     await conexion.query(
-      `INSERT INTO boletos (folio_boleto, numero, emision_id, cliente_id, venta_id, estacion_id, origen, estado)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'vigente')`,
-      [folioBoleto, numero, emisionId, clienteId, ventaId, estacionId, origen]
+      `INSERT INTO boletos (folio_boleto, numero, emision_id, cliente_id, venta_id, estacion_id, origen, estado, cuenta_credito_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'vigente', ?)`,
+      [folioBoleto, numero, emisionId, clienteId, ventaId, estacionId, origen, cuentaCreditoId]
     );
     folios.push(folioBoleto);
   }
@@ -122,13 +125,39 @@ async function reclamarFolio({ telefono, folio, estacionId, actor, ahora = new D
   if (!filaEstacion) return terminar(rechazo('ESTACION_NO_PARTICIPANTE'));
 
   const [venta] = await consultar(
-    'SELECT id, folio, fecha_hora, producto, litros, importe, forma_pago, estado FROM ventas WHERE estacion_id = ? AND folio = ?',
+    'SELECT id, folio, fecha_hora, producto, litros, importe, forma_pago, estado, cliente_codigo, cliente_nombre FROM ventas WHERE estacion_id = ? AND folio = ?',
     [estacion, folioLimpio]);
   if (!venta) return terminar(rechazo('FOLIO_INEXISTENTE'));
   if (venta.estado !== 'normal') return terminar(rechazo('VENTA_CANCELADA'));
   if (reglas.fueraDePlazo(venta.fecha_hora, p, ahora)) return terminar(rechazo('FUERA_DE_PLAZO'));
   if (reglas.formaPagoExcluida(venta.forma_pago, p.formasExcluidas)) return terminar(rechazo('FORMA_PAGO_EXCLUIDA'));
   if (!reglas.productoParticipante(venta.producto, p.productosParticipantes)) return terminar(rechazo('PRODUCTO_NO_PARTICIPANTE'));
+
+  // Titularidad en ventas a crédito (ORDEN 15): los boletos corresponden al
+  // titular de la cuenta, salvo teléfonos autorizados con carta. Contado no
+  // pasa por aquí.
+  let cuentaCredito = null;
+  if (reglas.normalizarTexto(venta.forma_pago) === 'credito') {
+    const codigo = String(venta.cliente_codigo ?? '').trim();
+    if (codigo) {
+      [cuentaCredito] = await consultar(
+        'SELECT id, codigo, nombre, telefono_titular FROM cuentas_credito WHERE codigo = ? AND activa = 1', [codigo]);
+    }
+    if (cuentaCredito) {
+      const esTitular = telefonoNormalizado === cuentaCredito.telefono_titular;
+      const [autorizado] = esTitular ? [true] : await consultar(
+        'SELECT id FROM credito_autorizados WHERE cuenta_id = ? AND telefono = ?',
+        [cuentaCredito.id, telefonoNormalizado]);
+      if (!autorizado) {
+        return terminar(rechazo('CREDITO_NO_AUTORIZADO'), 0,
+          `Cuenta ${cuentaCredito.codigo} (${cuentaCredito.nombre}): el teléfono ${telefonoNormalizado} no es el titular ni está autorizado.`);
+      }
+    } else if (p.creditoRequiereTitular) {
+      return terminar(rechazo('CREDITO_SIN_CUENTA'), 0,
+        `Venta a crédito con código ${codigo || 'sin código'} (${venta.cliente_nombre ?? 'sin nombre'}) sin cuenta registrada; reclamó ${telefonoNormalizado}.`);
+    }
+    // Bandera en false y cuenta no registrada: se emite a quien reclama.
+  }
 
   const cantidad = reglas.calcularCantidadBoletos({
     importe: Number(venta.importe), montoPorBoleto: p.montoPorBoleto, acumulaMultiplos: p.acumulaMultiplos,
@@ -163,7 +192,7 @@ async function reclamarFolio({ telefono, folio, estacionId, actor, ahora = new D
     }
 
     const folios = await emitirEnTransaccion(conexion, {
-      emisionId, cantidad, clienteId: cliente.id, ventaId: venta.id,
+      emisionId, cantidad, cuentaCreditoId: cuentaCredito ? cuentaCredito.id : null, clienteId: cliente.id, ventaId: venta.id,
       estacionId: estacion, origen: 'reclamo', formatoBoleto: p.formatoBoleto,
     });
     await conexion.commit();

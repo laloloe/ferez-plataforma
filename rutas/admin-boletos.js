@@ -136,12 +136,14 @@ router.get('/boletos/detalle', async (req, res, next) => {
       `SELECT b.*, c.nombre AS cliente, c.telefono, e.nombre AS estacion,
               v.id AS venta_id, v.folio AS folio_venta, v.fecha_hora AS venta_fecha,
               v.producto, v.litros, v.importe, v.forma_pago, v.estado AS venta_estado,
-              em.tipo AS emision_tipo, em.recibo, em.actor AS emision_actor, em.fecha AS emision_fecha
+              em.tipo AS emision_tipo, em.recibo, em.actor AS emision_actor, em.fecha AS emision_fecha,
+              cc.codigo AS cuenta_codigo, cc.nombre AS cuenta_nombre
        FROM boletos b
        JOIN clientes c ON c.id = b.cliente_id
        LEFT JOIN estaciones e ON e.id = b.estacion_id
        LEFT JOIN ventas v ON v.id = b.venta_id
        LEFT JOIN emisiones em ON em.id = b.emision_id
+       LEFT JOIN cuentas_credito cc ON cc.id = b.cuenta_credito_id
        WHERE b.folio_boleto = ?`, [folio]);
     if (!boleto) {
       return res.status(404).send(paginaAdmin('Boleto', '<h1>Boleto no encontrado</h1><p><a href="/admin/boletos">Volver al listado</a></p>'));
@@ -178,6 +180,8 @@ router.get('/boletos/detalle', async (req, res, next) => {
         <tr><th>Origen</th><td>${escaparHTML(boleto.origen)}</td></tr>
         <tr><th>Cliente</th><td>${escaparHTML(boleto.cliente)} · ${escaparHTML(boleto.telefono)}</td></tr>
         <tr><th>Estación</th><td>${escaparHTML(boleto.estacion ?? '—')}</td></tr>
+        ${boleto.cuenta_codigo ? `<tr><th>Cuenta de crédito</th><td>${escaparHTML(boleto.cuenta_codigo)} — ${escaparHTML(boleto.cuenta_nombre ?? '')}
+          (<a href="/admin/credito">ver cuentas</a>)</td></tr>` : ''}
         <tr><th>Emisión</th><td>${formatearFecha(boleto.emision_fecha)} por ${escaparHTML(boleto.emision_actor ?? '—')}</td></tr>
         <tr><th>Constancia</th><td><a href="/constancia?boleto=${encodeURIComponent(boleto.folio_boleto)}" target="_blank">Constancia electrónica del boleto</a>
           (pide el teléfono del titular)</td></tr>

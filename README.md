@@ -74,6 +74,7 @@ ticket a UTC al guardar.
 - `/admin/parametros` — parámetros del sorteo (tabla `configuracion`) editables con validación
 - `/admin/bitacora` — bitácora consultable del motor (emisiones, rechazos, anulaciones)
 - `/admin/captura` — captura manual de ventas (alta individual y CSV) para estaciones sin importación
+- `/admin/credito` — cuentas de crédito (flotillas): titular, teléfonos autorizados con carta, y códigos vistos sin cuenta (ORDEN 15)
 - `/admin/whatsapp` — conversaciones del bot, estado de envíos y reenvío manual
 - `/admin/remitentes` — lista blanca del buzón de importación (solo administrador): correo → estación, y qué estaciones esperan archivo diario
 - `/admin/sellado` — simulacro de sellado (repetible), sellado real (único, con doble confirmación) y muestra de boleto en PDF para el expediente ante la SEGOB
