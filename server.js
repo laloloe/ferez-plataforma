@@ -4,6 +4,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const modo = require('./servicios/modo-pruebas');
+const { leerConfiguracion } = require('./lib/configuracion');
 const { configurada } = require('./lib/db');
 const { ejecutarMigraciones } = require('./lib/migraciones');
 const rutaRegistro = require('./rutas/registro');
@@ -38,9 +39,19 @@ async function servirLanding(req, res) {
   const estado = await modo.estadoPublicoSeguro();
   if (estado === 'oculto') {
     html = html.replace(/<!--sorteo-->[\s\S]*?<!--\/sorteo-->/g, '');
-  } else if (estado === 'exhibicion') {
-    // Demo pública (ORDEN 12): ligas visibles con banda "DEMOSTRACIÓN".
-    html = html.replace(/<body([^>]*)>/, (todo, atributos) => `<body${atributos}>${modo.franjaExhibicionHTML()}`);
+  } else {
+    // Botón "WhatsApp del sorteo": solo con la clave whatsapp_link llena.
+    let enlaceWhatsApp = '';
+    try {
+      enlaceWhatsApp = String((await leerConfiguracion()).whatsapp_link ?? '').trim();
+    } catch { /* sin BD no hay liga */ }
+    html = enlaceWhatsApp
+      ? html.replace(/%%WHATSAPP_LINK%%/g, enlaceWhatsApp.replace(/"/g, '%22'))
+      : html.replace(/<!--whatsapp-->[\s\S]*?<!--\/whatsapp-->/g, '');
+    if (estado === 'exhibicion') {
+      // Demo pública (ORDEN 12): ligas visibles con banda "DEMOSTRACIÓN".
+      html = html.replace(/<body([^>]*)>/, (todo, atributos) => `<body${atributos}>${modo.franjaExhibicionHTML()}`);
+    }
   }
   res.type('html').send(html);
 }

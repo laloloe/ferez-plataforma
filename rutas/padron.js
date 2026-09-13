@@ -213,6 +213,27 @@ router.get('/boletos', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---------- Bases del sorteo (placeholder, ORDEN 13) ----------
+
+router.get('/bases', async (req, res, next) => {
+  try {
+    const franja = await franjaOModoPruebas(req);
+    if (franja === null) {
+      return res.send(pagina(PROXIMAMENTE, { titulo: TITULO_PROXIMAMENTE }));
+    }
+    res.send(pagina(`
+      <section class="portada">
+        <h1>Bases del Sorteo Ferez 2027</h1>
+        <p>Participación gratuita con tu carga de combustible.</p>
+      </section>
+      <main>
+        <p>Las bases completas del Sorteo Ferez 2027 se publicarán aquí al inicio de la promoción.</p>
+        <p class="nota-legal">Mientras tanto, puedes revisar el <a href="/boletos">padrón público</a>
+        y la <a href="/boletos/sellado">verificación y sellado</a> de la lista de boletos.</p>
+      </main>`, { franja, titulo: 'Bases del sorteo — Gasolineras Ferez' }));
+  } catch (err) { next(err); }
+});
+
 // ---------- Sellado del padrón (público) ----------
 
 router.get('/boletos/sellado', async (req, res, next) => {

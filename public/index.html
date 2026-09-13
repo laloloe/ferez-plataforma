@@ -238,6 +238,28 @@ footer .legal{grid-column:1 / -1;border-top:1px solid var(--linea-osc);padding-t
   :root{--dh:clamp(78px,21vw,110px)}
   body{font-size:16px}
 }
+/* Cinta y sección del sorteo (ORDEN 13). La cinta es un bloque propio bajo
+   el header (no sticky): empuja el hero hacia abajo y toda ella es tocable. */
+.cinta-sorteo{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 18px;background:var(--verde);color:var(--papel);text-decoration:none;padding:13px 20px;text-align:center}
+.cinta-sorteo:hover{background:var(--verde-prof)}
+.cinta-sorteo .ct{font-family:var(--cond);font-weight:700;letter-spacing:.04em;font-size:clamp(16px,3.6vw,20px)}
+.cinta-sorteo .ct strong{font-family:var(--display);font-weight:400;letter-spacing:.05em}
+.cinta-sorteo .cta{font-family:var(--body);font-weight:700;font-size:15px;border:2px solid var(--papel);border-radius:999px;padding:7px 16px;white-space:nowrap}
+.sorteo{background:var(--papel);color:var(--tinta);border-top:3px solid var(--verde);border-bottom:3px solid var(--verde);scroll-margin-top:118px}
+.sorteo .wrap{padding-top:56px;padding-bottom:56px}
+.sorteo h2{font-family:var(--display);font-weight:400;color:var(--negro);font-size:clamp(24px,5vw,34px);margin-bottom:6px}
+.sorteo .sub{color:var(--gris);font-size:17px;margin-bottom:26px}
+.pasos{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-bottom:30px}
+.paso{background:var(--blanco);border:1px solid var(--linea);border-radius:12px;padding:18px}
+.paso b.n{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--verde);color:var(--blanco);font-family:var(--display);font-weight:400;margin-bottom:10px}
+.paso p{font-size:15.5px;line-height:1.55}
+.botonera-sorteo{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:18px}
+.botonera-sorteo a{display:block;text-align:center;background:var(--verde);color:var(--blanco);text-decoration:none;font-weight:700;font-size:16px;padding:16px 18px;border-radius:10px}
+.botonera-sorteo a:hover{background:var(--verde-prof)}
+.botonera-sorteo a.secundario{background:var(--negro);color:var(--papel)}
+.sorteo .transparencia{font-size:14px;color:var(--gris);border-top:1px solid var(--linea);padding-top:14px}
+.sorteo .transparencia a{color:var(--verde-prof);font-weight:700}
+@media (max-width:640px){.cinta-sorteo{flex-direction:column;gap:8px;padding:12px 16px}}
 </style>
 </head>
 <body>
@@ -269,6 +291,13 @@ footer .legal{grid-column:1 / -1;border-top:1px solid var(--linea-osc);padding-t
 </div>
 
 <main id="main">
+<!--sorteo-->
+<!-- CINTA DEL SORTEO (ORDEN 13): bloque propio bajo el header, toda tocable -->
+<a class="cinta-sorteo" href="#sorteo" aria-label="Sorteo Ferez 2027: cómo participar">
+  <span class="ct"><strong>SORTEO FEREZ 2027</strong> — Cada $700 de carga te da un boleto</span>
+  <span class="cta">Cómo participar ↓</span>
+</a>
+<!--/sorteo-->
 <!-- HERO -->
 <section class="hero" id="hero">
   <!-- FOTO 1 · PRESENTACIÓN. Panorámica de una estación: pista completa, de preferencia
@@ -297,6 +326,32 @@ footer .legal{grid-column:1 / -1;border-top:1px solid var(--linea-osc);padding-t
     </div>
   </div>
 </section>
+
+<!--sorteo-->
+<!-- SORTEO (ORDEN 13) -->
+<section class="sorteo" id="sorteo">
+  <div class="wrap">
+    <h2>Sorteo Ferez 2027</h2>
+    <p class="sub">Participación gratuita con tu carga de combustible: cada carga puede volverse un premio.</p>
+    <div class="pasos">
+      <div class="paso"><b class="n">1</b><p>Regístrate una sola vez en <strong>ferez.mx/registro</strong>. Tu teléfono es tu identificación.</p></div>
+      <div class="paso"><b class="n">2</b><p>Carga combustible: cada <strong>$700 en una misma operación</strong> = 1 boleto, acumulable ($1,400 = 2, $2,100 = 3…).</p></div>
+      <div class="paso"><b class="n">3</b><p>Envía por WhatsApp el <strong>folio de tu ticket</strong> dentro de los 7 días siguientes.</p></div>
+      <div class="paso"><b class="n">4</b><p>Recibe tu <strong>número de boleto</strong> y consúltalo cuando quieras.</p></div>
+    </div>
+    <div class="botonera-sorteo">
+      <a href="/registro">Registrarme</a>
+      <a href="/boletos">Consultar boletos</a>
+      <!--whatsapp--><a href="%%WHATSAPP_LINK%%">WhatsApp del sorteo</a><!--/whatsapp-->
+      <a class="secundario" href="/constancia">Mi constancia</a>
+      <a class="secundario" href="/boletos/sellado">Verificación y sellado</a>
+      <a class="secundario" href="/bases">Bases del sorteo</a>
+    </div>
+    <p class="transparencia">Padrón público y sellado verificable: nadie puede alterar los boletos.
+      <a href="/boletos/sellado">Conoce cómo verificarlo</a>.</p>
+  </div>
+</section>
+<!--/sorteo-->
 
 <!-- HISTORIA -->
 <section class="historia" id="historia">
@@ -415,7 +470,7 @@ footer .legal{grid-column:1 / -1;border-top:1px solid var(--linea-osc);padding-t
         <p class="tag">SORTEOS</p>
         <h3>Consulta tus boletos</h3>
         <p>Cada carga participa: tus tickets generan boletos para nuestros sorteos. Revisa los tuyos y entérate si tu próxima visita llega con premio.</p>
-        <a class="btn mapa" href="/boletos">Consultar mis boletos</a>
+        <a class="btn mapa" href="#sorteo">Consultar mis boletos</a>
       </div>
       <!--/sorteo-->
     </div>

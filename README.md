@@ -77,6 +77,7 @@ ticket a UTC al guardar.
 - `/admin/whatsapp` — conversaciones del bot, estado de envíos y reenvío manual
 - `/admin/remitentes` — lista blanca del buzón de importación (solo administrador): correo → estación, y qué estaciones esperan archivo diario
 - `/admin/sellado` — simulacro de sellado (repetible), sellado real (único, con doble confirmación) y muestra de boleto en PDF para el expediente ante la SEGOB
+- `/bases` — bases del sorteo (placeholder hasta publicar las finales; mismo interruptor que /boletos)
 - `/constancia` — constancia electrónica del boleto (boleto + teléfono del titular; con `numero_permiso` vacío se muestra EN TRÁMITE y el sitio no la enlaza)
 - `/webhooks/whatsapp` — webhook de la Cloud API de Meta (verificación GET + mensajes POST firmados)
 - `/salud` — estado del servicio

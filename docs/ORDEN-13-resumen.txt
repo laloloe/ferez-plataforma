@@ -1,0 +1,104 @@
+ORDEN 13 — RESUMEN DE ENTREGA
+Cinta promocional y sección del sorteo en la landing
+104 pruebas en verde (1 nueva + 3 ampliadas). Verificado con capturas
+de pantalla en viewport de iPhone (390px) y escritorio.
+
+============================================================
+LO CAMBIADO
+============================================================
+
+CINTA DEL SORTEO (entre el header y el hero)
+  Bloque propio de ancho completo (no sticky, empuja el hero hacia
+  abajo): fondo Verde Ferez #12852A, texto Papel #F2F4F1, tipografías
+  del sitio, sin emojis. Texto "SORTEO FEREZ 2027 — Cada $700 de carga
+  te da un boleto" + botón "Cómo participar ↓". TODA la cinta es
+  tocable y hace scroll suave al ancla #sorteo (el sitio ya usa
+  scroll-behavior:smooth). En pantalla angosta se acomoda en dos
+  renglones + botón, verificado con captura.
+
+SECCIÓN #sorteo (entre el hero y la historia)
+  - Título "Sorteo Ferez 2027" + subtítulo de una línea (participación
+    gratuita con tu carga).
+  - "Cómo participar" en 4 pasos con los textos de las bases
+    (registro único con teléfono, $700 = 1 boleto acumulable, folio
+    por WhatsApp en 7 días, número de boleto consultable).
+  - Botonera de 6 botones grandes (cómodos a un pulgar):
+    Registrarme → /registro · Consultar boletos → /boletos ·
+    Mi constancia → /constancia · Verificación y sellado →
+    /boletos/sellado · Bases del sorteo → /bases · WhatsApp del
+    sorteo → clave whatsapp_link (si está vacía, el botón NO aparece).
+  - Línea de transparencia al pie: "Padrón público y sellado
+    verificable: nadie puede alterar los boletos" con liga a
+    /boletos/sellado.
+  - La tarjeta de sorteos de "Recompensas" ahora enlaza a #sorteo (sin
+    duplicar contenido).
+  - El ancla lleva scroll-margin para que el título no quede bajo el
+    header pegajoso del sitio (detectado y corregido en la revisión
+    visual móvil).
+
+PÁGINA /bases (placeholder)
+  Con la identidad del sitio: "Las bases completas del Sorteo Ferez
+  2027 se publicarán aquí al inicio de la promoción", más ligas al
+  padrón y al sellado. Obedece el mismo interruptor: fuera de
+  exhibición/permiso responde "Próximamente"; en exhibición lleva la
+  franja ámbar.
+
+INTERRUPTOR (ORDEN 12, sin cambios de lógica)
+  Cinta y sección viven dentro de los bloques <!--sorteo--> de la
+  landing: ocultas con todo apagado, visibles en exhibición (con banda
+  "DEMOSTRACIÓN — SIN VALIDEZ" encima de todo) y visibles limpias con
+  numero_permiso llena. La prueba automática de "sin trámites en la
+  landing" ahora cubre también la cinta y la sección.
+
+CLAVE NUEVA EN configuracion
+  whatsapp_link (vacía) — liga https://wa.me/… del WhatsApp del
+  sorteo; editable en /admin/parametros con validación (debe ser
+  https://). Vacía = botón oculto. Migración 014: solo ese INSERT.
+
+============================================================
+CÓMO PROBAR EN 5 PASOS
+============================================================
+
+1. Con todo oculto (modo_exhibicion=false, permiso vacío), abre
+   ferez.mx en ventana privada: sin cinta, sin sección, y /bases
+   responde "Próximamente".
+
+2. Enciende modo_exhibicion en /admin/parametros y recarga: banda
+   ámbar arriba, y debajo del header la cinta verde del sorteo
+   empujando el hero. Tócala en cualquier parte: scroll suave a la
+   sección "Sorteo Ferez 2027" con los 4 pasos.
+
+3. Prueba los botones: Registrarme, Consultar boletos, Mi constancia,
+   Verificación y sellado, y Bases (placeholder con franja). El botón
+   de WhatsApp NO debe aparecer todavía.
+
+4. Pon en whatsapp_link la liga real (https://wa.me/521…), recarga la
+   portada y confirma que aparece "WhatsApp del sorteo" y abre el
+   chat. Bórrala si aún no quieres exponerla.
+
+5. En un iPhone (o ventana angosta): cinta en dos renglones + botón,
+   banda ámbar arriba sin tapar nada, y al tocar "Cómo participar" el
+   título de la sección queda completo bajo el header.
+
+============================================================
+SUPUESTOS
+============================================================
+
+- La flecha del botón es el carácter tipográfico "↓" (no es emoji).
+- La tarjeta de Recompensas conserva su texto "Consultar mis boletos"
+  pero ahora lleva a #sorteo, donde está el botón real de consulta.
+- El paso 3 dice "Envía por WhatsApp": mientras el bot siga en el
+  número de prueba, el botón de WhatsApp permanece oculto (clave
+  vacía) y nadie tiene un número que marcar; se llenará cuando la
+  línea real esté lista.
+- /bases usa la plantilla pública del padrón; el contenido final de
+  las bases llegará en otra orden y solo sustituirá ese cuerpo.
+
+============================================================
+RECORDATORIO
+============================================================
+
+Revisa el deploy en Railway: al arrancar aplicará la migración
+014_whatsapp_link.sql (un solo INSERT IGNORE — sin riesgo para TiDB).
+Con modo_exhibicion=true ya visible, la familia verá la cinta y la
+sección de inmediato tras el deploy.
