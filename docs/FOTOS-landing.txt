@@ -1,0 +1,89 @@
+FOTOS PARA LA LANDING DE FEREZ.MX
+Lista de espacios fotográficos, con descripción y medidas.
+(2 ya están cargadas; faltan 5. Los espacios pendientes muestran hoy un
+fondo de marca con la leyenda "PENDIENTE · FOTO".)
+
+Recomendaciones generales
+- Formato JPG, buena luz natural, sin gente identificable en primer
+  plano (o con su permiso). Peso ideal por archivo: menos de 500 KB
+  (yo las optimizo al integrarlas, pueden mandarse en tamaño original).
+- Pueden enviarse como hasta ahora: adjuntas en PDF o el archivo
+  original directo al chat.
+- Las medidas son MÍNIMAS; más grande siempre funciona. Lo importante
+  es la orientación y dónde queda el sujeto.
+
+============================================================
+YA CARGADAS (por si quieren sustituirse)
+============================================================
+
+FOTO 1 — PORTADA (hero, arriba de todo)
+  En uso: la primera estación Ferez en Rubio (bomba original, barda
+  de Pemex), aclarada por instrucción tuya.
+  Si algún día se cambia: panorámica horizontal de una estación con
+  la pista completa, de preferencia al atardecer o de noche con las
+  luces encendidas.
+  Medidas: horizontal, mínimo 2000 × 1100 px (aprox. 16:9).
+  OJO: el tercio IZQUIERDO se oscurece con un degradado para que el
+  texto se lea; lo importante de la imagen debe quedar al CENTRO-
+  DERECHA.
+
+FOTO 2 — HISTORIA (retrato del fundador)
+  En uso: retrato de Don Jorge Ferez Chávez (del PDF que enviaste).
+  Si se cambia: retrato de Don Jorge y doña Esperanza, o foto antigua
+  de la primera estación.
+  Medidas: VERTICAL, proporción 4:5, mínimo 1200 × 1500 px.
+
+============================================================
+PENDIENTES (5 fotos)
+============================================================
+
+FOTO 3 — BANDA DE CAMINO (franja panorámica a media página)
+  Qué: escena de camino o pista en movimiento — un camión saliendo de
+  la estación, la carretera de Cuauhtémoc, la pista de noche con
+  estelas de luces. Es una foto de AMBIENTE: se muestra oscurecida
+  (al 45% de opacidad) detrás de una frase grande en blanco, así que
+  vale más la atmósfera que el detalle.
+  Medidas: horizontal panorámica, mínimo 2000 × 900 px. El motivo
+  principal debe quedar al CENTRO (los bordes se recortan según la
+  pantalla).
+
+FOTO 4 — FLOTILLAS (franja ancha dentro de la sección de crédito
+  empresarial)
+  Qué: un tractocamión, camión de carga o pipa cargando diésel en la
+  estación. Ideal: la unidad de costado con la bomba y el despachador
+  en cuadro. Transmite "aquí cargan las flotillas".
+  Medidas: horizontal MUY ancha, proporción 21:9, mínimo
+  2000 × 860 px. Sujeto al centro; arriba y abajo se recorta poco,
+  izquierda y derecha nada.
+
+FOTO 5 — ESTACIÓN "SERVICIO GASOLINERO DEL CAMPO" (Km 12.9)
+  Qué: fachada/pista de la estación del Corredor Comercial, tomada de
+  día, de frente o en ligero ángulo, con la marca visible. Es la foto
+  de su tarjeta en la sección de ubicaciones.
+  Medidas: horizontal, proporción 16:10, mínimo 1200 × 750 px.
+
+FOTO 6 — ESTACIÓN "SERVICIO FEREZ" (Rubio)
+  Qué: igual que la anterior, para la estación de Rubio. Puede ser la
+  estación actual (la histórica ya vive en la portada; mejor no
+  repetirla aquí).
+  Medidas: horizontal, proporción 16:10, mínimo 1200 × 750 px.
+
+FOTO 7 — ESTACIÓN "OASIS"
+  Qué: igual que las anteriores, para Oasis.
+  Medidas: horizontal, proporción 16:10, mínimo 1200 × 750 px.
+  Consejo: tomar las tres fotos de estación con la misma luz y el
+  mismo encuadre (misma hora del día, misma distancia) para que la
+  fila de tarjetas se vea uniforme.
+
+============================================================
+RESUMEN RÁPIDO
+============================================================
+
+  #  Espacio            Orientación   Proporción   Mínimo (px)   Estado
+  1  Portada (hero)     Horizontal    ~16:9        2000 × 1100   CARGADA
+  2  Historia/fundador  Vertical      4:5          1200 × 1500   CARGADA
+  3  Banda de camino    Panorámica    ~21:9        2000 × 900    FALTA
+  4  Flotillas          Panorámica    21:9         2000 × 860    FALTA
+  5  Estación Campo     Horizontal    16:10        1200 × 750    FALTA
+  6  Estación Rubio     Horizontal    16:10        1200 × 750    FALTA
+  7  Estación Oasis     Horizontal    16:10        1200 × 750    FALTA
