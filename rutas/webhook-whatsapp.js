@@ -19,14 +19,26 @@ router.get('/webhooks/whatsapp', (req, res) => {
 });
 
 router.post('/webhooks/whatsapp', (req, res) => {
+  // Diagnóstico en logs (ORDEN 17): UNA línea por POST — timestamp,
+  // resultado, si traía encabezado de firma y tamaño del cuerpo. Jamás el
+  // token, el secreto, el cuerpo del mensaje ni teléfonos.
+  const traeFirma = Boolean(req.headers['x-hub-signature-256']);
+  const bytes = req.rawBody ? req.rawBody.length : 0;
+  const registrar = (resultado) => {
+    console.log(`[webhook-whatsapp] ${new Date().toISOString()} ${resultado} encabezado-firma=${traeFirma ? 'si' : 'no'} bytes=${bytes}`);
+  };
+
   if (!whatsappApi.configurado() || !configurada()) {
+    registrar('NO_CONFIGURADO');
     return res.status(503).json({ ok: false, mensaje: 'Webhook de WhatsApp no disponible' });
   }
   const firmaValida = bot.validarFirma(
     req.rawBody, req.headers['x-hub-signature-256'], process.env.WHATSAPP_APP_SECRET);
   if (!firmaValida) {
+    registrar('FIRMA_INVALIDA');
     return res.status(401).json({ ok: false, mensaje: 'Firma inválida' });
   }
+  registrar('FIRMA_OK');
 
   // Meta exige respuesta rápida: 200 ya, el trabajo después.
   res.sendStatus(200);
