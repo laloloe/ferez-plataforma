@@ -1,0 +1,74 @@
+OPCIÓN B — RESUMEN DE ENTREGA
+"Olvidé mi contraseña" por correo en el panel
+129 pruebas en verde (8 nuevas).
+
+============================================================
+CÓMO FUNCIONA
+============================================================
+
+1. En ferez.mx/admin/acceso aparece la liga "Olvidé mi contraseña"
+   (solo cuando hay correo saliente configurado).
+2. El usuario escribe su correo. La respuesta es SIEMPRE la misma,
+   exista o no el correo (sin revelar quién tiene cuenta): "Si el
+   correo está registrado, te enviamos una liga...".
+3. Si el correo existe y está activo, recibe una liga de
+   restablecimiento con vigencia de 30 MINUTOS y UN SOLO USO. En la
+   base de datos solo vive el SHA-256 del token, nunca el token.
+4. La liga abre un formulario de contraseña nueva (mínimo 10
+   caracteres, con confirmación). Al guardarla: entra de inmediato,
+   se limpia cualquier bloqueo por intentos fallidos, y queda asiento
+   en bitácora (RESTABLECIMIENTO_OK). Reutilizar la liga o usarla
+   vencida se rechaza.
+5. Límite anti-abuso: 3 solicitudes por hora por correo/IP; a partir
+   de la cuarta ya no se envía nada (misma respuesta genérica).
+6. Ni contraseñas, ni tokens, ni el secreto SMTP tocan logs o
+   bitácora (probado).
+
+============================================================
+VARIABLES EN RAILWAY (elige una de dos)
+============================================================
+
+Opción simple (recomendada): nada nuevo si ya cargaste las variables
+del buzón de importación de Gmail (ORDEN 10) — la misma contraseña de
+aplicación sirve para enviar: el sistema usa IMPORT_MAIL_USER /
+IMPORT_MAIL_PASSWORD contra smtp.gmail.com automáticamente.
+
+Opción explícita (si quieres otro remitente):
+  SMTP_HOST      p. ej. smtp.gmail.com
+  SMTP_USER      correo remitente
+  SMTP_PASSWORD  contraseña de aplicación
+  SMTP_PORT      opcional, default 465
+
+Sin ninguna de las dos, la función queda apagada y la liga no aparece.
+
+============================================================
+CÓMO PROBAR EN 5 PASOS
+============================================================
+
+1. Verifica que el deploy aplicó la migración 017 (tabla
+   restablecimientos) y que las variables de correo están cargadas.
+2. Abre ferez.mx/admin/acceso: debe aparecer "Olvidé mi contraseña".
+3. Pide la liga con tu correo real del panel; revisa tu bandeja (y
+   correo no deseado) — llega de la cuenta del buzón de importación.
+4. Abre la liga, pon una contraseña nueva (10+ caracteres) y entra
+   con ella. Intenta abrir la MISMA liga otra vez: debe rechazarse.
+5. Pide la liga con un correo inventado: misma respuesta en pantalla
+   y ningún correo enviado. Pide 4 ligas seguidas con el tuyo: la
+   cuarta ya no llega (límite por hora).
+
+============================================================
+SUPUESTOS
+============================================================
+
+- El remitente es el buzón de importación (Gmail) salvo que definas
+  SMTP_*; Gmail permite SMTP con la misma contraseña de aplicación.
+- La liga usa SITIO_URL (default https://ferez.mx) para armar la URL.
+- Usuarios desactivados no pueden restablecer (la liga no se envía ni
+  se acepta).
+- Esto NO sustituye el candado de la ORDEN 6: el acceso provisional
+  de entorno sigue deshabilitado mientras exista un administrador
+  activo. Ahora, simplemente, ya no lo necesitas para recuperarte.
+
+RECORDATORIO: revisa el deploy en Railway (migración 017: un CREATE
+TABLE — sin riesgo para TiDB) y luego corre los pasos 2-4 con tu
+propio usuario, que es el caso que originó esta orden.

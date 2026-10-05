@@ -18,6 +18,7 @@ const { leerConfiguracion } = require('../lib/configuracion');
 const usuarios = require('../servicios/usuarios');
 const reinicio = require('../servicios/reinicio');
 const importacionCorreo = require('../servicios/importacion-correo');
+const restablecimiento = require('../servicios/restablecimiento');
 const { escaparHTML, paginaAdmin } = require('../lib/html');
 const { formatearFecha } = require('../lib/fechas'); // hora local (ORDEN 11)
 
@@ -60,6 +61,9 @@ function paginaAcceso(res, avisoHTML = '', notaProvisional = '') {
       <input type="password" id="contrasena" name="contrasena" autocomplete="current-password" required></div>
       <button type="submit">Entrar</button>
     </form>
+    ${restablecimiento.configurado()
+      ? '<p style="margin-top:4px"><a href="/admin/olvide-contrasena">Olvidé mi contraseña</a></p>'
+      : ''}
     ${notaProvisional}`));
 }
 
@@ -110,6 +114,73 @@ router.post('/acceso', async (req, res, next) => {
       }
     }
     paginaAcceso(res, '<p class="msj error">Credenciales incorrectas.</p>');
+  } catch (err) { next(err); }
+});
+
+// ---------- Olvidé mi contraseña (opción B): antes de la autenticación ----------
+
+const AVISO_LIGA_ENVIADA = `<p class="msj ok">Si el correo está registrado, te enviamos una liga para
+  restablecer tu contraseña (vigencia ${restablecimiento.MINUTOS_VIGENCIA} minutos, un solo uso).
+  Revisa tu bandeja de entrada y el correo no deseado.</p>`;
+
+router.get('/olvide-contrasena', (req, res) => {
+  if (!restablecimiento.configurado()) return res.redirect('/admin/acceso');
+  res.send(paginaAdmin('Olvidé mi contraseña', `
+    <h1>Olvidé mi contraseña</h1>
+    <p>Escribe el correo con el que entras al panel y te enviaremos una liga para
+    definir una contraseña nueva.</p>
+    <form class="linea" method="post" action="/admin/olvide-contrasena">
+      <div><label for="correo">Correo</label>
+      <input type="email" id="correo" name="correo" required maxlength="190"></div>
+      <button type="submit">Enviar liga</button>
+    </form>
+    <p><a href="/admin/acceso">Volver al acceso</a></p>`));
+});
+
+router.post('/olvide-contrasena', async (req, res, next) => {
+  try {
+    if (!configurada()) return paginaAcceso(res, '<p class="msj error">Servicio no disponible por el momento.</p>');
+    const resultado = await restablecimiento.solicitar({ correo: req.body.correo, ip: req.ip });
+    if (!resultado.ok) {
+      return paginaAcceso(res, '<p class="msj error">La recuperación por correo no está disponible. Contacta a un administrador.</p>');
+    }
+    // Respuesta idéntica exista o no el correo: sin enumeración de usuarios.
+    paginaAcceso(res, AVISO_LIGA_ENVIADA);
+  } catch (err) { next(err); }
+});
+
+function paginaRestablecer(res, token, avisoHTML = '') {
+  res.send(paginaAdmin('Restablecer contraseña', `
+    <h1>Restablecer contraseña</h1>
+    ${avisoHTML}
+    <form class="linea" method="post" action="/admin/restablecer">
+      <input type="hidden" name="token" value="${escaparHTML(token)}">
+      <div><label>Nueva contraseña (mínimo ${usuarios.MIN_CONTRASENA} caracteres)</label>
+      <input type="password" name="nueva" autocomplete="new-password" required minlength="${usuarios.MIN_CONTRASENA}"></div>
+      <div><label>Repite la contraseña</label>
+      <input type="password" name="confirmacion" autocomplete="new-password" required minlength="${usuarios.MIN_CONTRASENA}"></div>
+      <button type="submit">Guardar</button>
+    </form>`));
+}
+
+router.get('/restablecer', (req, res) => {
+  const token = String(req.query.token ?? '').trim();
+  if (!token) return res.redirect('/admin/acceso');
+  paginaRestablecer(res, token);
+});
+
+router.post('/restablecer', async (req, res, next) => {
+  try {
+    if (!configurada()) return paginaAcceso(res, '<p class="msj error">Servicio no disponible por el momento.</p>');
+    const token = String(req.body.token ?? '').trim();
+    if (String(req.body.nueva ?? '') !== String(req.body.confirmacion ?? '')) {
+      return paginaRestablecer(res, token, '<p class="msj error">Las contraseñas no coinciden.</p>');
+    }
+    const resultado = await restablecimiento.restablecer({ token, nueva: req.body.nueva });
+    if (!resultado.ok) {
+      return paginaRestablecer(res, token, `<p class="msj error">${escaparHTML(resultado.mensaje)}</p>`);
+    }
+    paginaAcceso(res, '<p class="msj ok">Contraseña actualizada. Entra con tu nueva contraseña.</p>');
   } catch (err) { next(err); }
 });
 

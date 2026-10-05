@@ -29,6 +29,12 @@ Abre http://localhost:3000
 
 ## Variables de entorno
 
+"Olvidé mi contraseña" (opcional): `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`
+(+ `SMTP_PORT`, default 465) para el correo saliente de restablecimiento; si
+no están y el buzón de importación es Gmail, se reutilizan IMPORT_MAIL_USER/
+PASSWORD contra smtp.gmail.com. Sin nada de esto, la liga no aparece en el
+acceso. Token de un solo uso, 30 minutos, solo su SHA-256 en BD.
+
 Importación por correo (ORDEN 10, opcional): `IMPORT_MAIL_HOST` (p. ej.
 imap.gmail.com), `IMPORT_MAIL_USER`, `IMPORT_MAIL_PASSWORD` (contraseña de
 aplicación) y opcional `IMPORT_MAIL_PORT` (993). Sin las tres primeras, la
