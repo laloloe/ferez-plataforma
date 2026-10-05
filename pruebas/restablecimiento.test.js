@@ -28,6 +28,22 @@ async function pedir(ruta, { metodo = 'GET', cuerpo } = {}) {
   return { status: respuesta.status, texto: await respuesta.text() };
 }
 
+// El envío ahora corre en segundo plano tras responder: espera activa corta.
+async function esperarA(condicion, ms = 2000) {
+  const limite = Date.now() + ms;
+  while (Date.now() < limite) {
+    if (await condicion()) return true;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  return condicion();
+}
+
+async function solicitudesEnBitacora() {
+  const [{ total }] = await consultar(
+    "SELECT COUNT(*) AS total FROM bitacora_boletos WHERE resultado = 'RESTABLECIMIENTO_SOLICITADO'");
+  return Number(total);
+}
+
 function ultimaLiga() {
   const correo = enviados[enviados.length - 1];
   const m = correo.texto.match(/\/admin\/restablecer\?token=([0-9a-f]{64})/);
@@ -69,10 +85,12 @@ test('la pantalla de acceso muestra la liga cuando hay SMTP configurado', { skip
   assert.equal(r.texto.includes('/admin/olvide-contrasena'), true);
 });
 
-test('solicitud con correo registrado: respuesta genérica y liga por correo; solo el hash vive en BD', { skip: !hayBD }, async () => {
+test('solicitud con correo registrado: respuesta genérica INMEDIATA y liga por correo; solo el hash vive en BD', { skip: !hayBD }, async () => {
+  const inicio = Date.now();
   const r = await pedir('/admin/olvide-contrasena', { metodo: 'POST', cuerpo: { correo: CORREO } });
   assert.equal(r.texto.includes('Si el correo está registrado'), true);
-  assert.equal(enviados.length, 1);
+  assert.equal(Date.now() - inicio < 2000, true, 'la respuesta no espera al envío');
+  assert.equal(await esperarA(() => enviados.length === 1), true, 'el correo sale en segundo plano');
   assert.equal(enviados[0].destino, CORREO);
   const token = ultimaLiga();
   assert.equal(Boolean(token), true, 'la liga trae el token');
@@ -83,8 +101,11 @@ test('solicitud con correo registrado: respuesta genérica y liga por correo; so
 
 test('correo inexistente: misma respuesta genérica y nada enviado', { skip: !hayBD }, async () => {
   const antes = enviados.length;
+  const solicitudesAntes = await solicitudesEnBitacora();
   const r = await pedir('/admin/olvide-contrasena', { metodo: 'POST', cuerpo: { correo: 'nadie@nada.mx' } });
   assert.equal(r.texto.includes('Si el correo está registrado'), true, 'texto idéntico: sin enumeración');
+  assert.equal(await esperarA(async () => (await solicitudesEnBitacora()) > solicitudesAntes), true,
+    'la solicitud sí se procesó (bitácora)');
   assert.equal(enviados.length, antes, 'sin correo enviado');
 });
 
@@ -136,6 +157,7 @@ test('límite: a la cuarta solicitud en una hora ya no se envía correo (respues
   for (let i = 1; i <= restablecimiento.LIMITE_SOLICITUDES_HORA + 1; i++) {
     const r = await pedir('/admin/olvide-contrasena', { metodo: 'POST', cuerpo: { correo: CORREO } });
     assert.equal(r.texto.includes('Si el correo está registrado'), true, `respuesta genérica en el intento ${i}`);
+    assert.equal(await esperarA(async () => (await solicitudesEnBitacora()) === i), true, `solicitud ${i} procesada`);
   }
   assert.equal(enviados.length - antes, restablecimiento.LIMITE_SOLICITUDES_HORA, 'la cuarta ya no envió');
 });
@@ -147,6 +169,8 @@ test('sin SMTP: la liga desaparece del acceso y el servicio responde apagado', {
   try {
     const acceso = await pedir('/admin/acceso');
     assert.equal(acceso.texto.includes('Olvidé mi contraseña'), false);
+    const post = await pedir('/admin/olvide-contrasena', { metodo: 'POST', cuerpo: { correo: CORREO } });
+    assert.equal(post.texto.includes('no está disponible'), true, 'el POST avisa sin colgarse');
     const r = await restablecimiento.solicitar({ correo: CORREO, ip: 'x' });
     assert.equal(r.ok, false);
     assert.equal(r.codigo, 'NO_CONFIGURADO');
@@ -154,6 +178,25 @@ test('sin SMTP: la liga desaparece del acceso y el servicio responde apagado', {
     process.env.SMTP_HOST = guardadas.host;
     process.env.SMTP_USER = guardadas.user;
     process.env.SMTP_PASSWORD = guardadas.pass;
+    restablecimiento._fijarEnviador(async (destino, asunto, texto) => { enviados.push({ destino, asunto, texto }); });
+  }
+});
+
+test('si el envío falla, la respuesta sigue siendo genérica y el error queda en bitácora', { skip: !hayBD }, async () => {
+  await consultar('DELETE FROM bitacora_boletos');
+  restablecimiento._fijarEnviador(async () => { throw new Error('puerto SMTP bloqueado (simulado)'); });
+  try {
+    const inicio = Date.now();
+    const r = await pedir('/admin/olvide-contrasena', { metodo: 'POST', cuerpo: { correo: CORREO } });
+    assert.equal(r.texto.includes('Si el correo está registrado'), true);
+    assert.equal(Date.now() - inicio < 2000, true, 'sin colgarse aunque el envío falle');
+    const hayError = await esperarA(async () => {
+      const [{ total }] = await consultar(
+        "SELECT COUNT(*) AS total FROM bitacora_boletos WHERE resultado = 'RESTABLECIMIENTO_ERROR'");
+      return Number(total) === 1;
+    });
+    assert.equal(hayError, true, 'el fallo de envío queda en bitácora para el administrador');
+  } finally {
     restablecimiento._fijarEnviador(async (destino, asunto, texto) => { enviados.push({ destino, asunto, texto }); });
   }
 });

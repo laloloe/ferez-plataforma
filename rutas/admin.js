@@ -137,16 +137,19 @@ router.get('/olvide-contrasena', (req, res) => {
     <p><a href="/admin/acceso">Volver al acceso</a></p>`));
 });
 
-router.post('/olvide-contrasena', async (req, res, next) => {
-  try {
-    if (!configurada()) return paginaAcceso(res, '<p class="msj error">Servicio no disponible por el momento.</p>');
-    const resultado = await restablecimiento.solicitar({ correo: req.body.correo, ip: req.ip });
-    if (!resultado.ok) {
-      return paginaAcceso(res, '<p class="msj error">La recuperación por correo no está disponible. Contacta a un administrador.</p>');
-    }
-    // Respuesta idéntica exista o no el correo: sin enumeración de usuarios.
-    paginaAcceso(res, AVISO_LIGA_ENVIADA);
-  } catch (err) { next(err); }
+router.post('/olvide-contrasena', (req, res) => {
+  if (!configurada() || !restablecimiento.configurado()) {
+    return paginaAcceso(res, '<p class="msj error">La recuperación por correo no está disponible. Contacta a un administrador.</p>');
+  }
+  // Respuesta inmediata y genérica; el correo sale en segundo plano
+  // (el envío jamás debe dejar al visitante esperando).
+  paginaAcceso(res, AVISO_LIGA_ENVIADA);
+  const datos = { correo: req.body.correo, ip: req.ip };
+  setImmediate(() => {
+    restablecimiento.solicitar(datos).catch((err) => {
+      console.error('restablecimiento: fallo en la solicitud:', String(err.message).slice(0, 200));
+    });
+  });
 });
 
 function paginaRestablecer(res, token, avisoHTML = '') {

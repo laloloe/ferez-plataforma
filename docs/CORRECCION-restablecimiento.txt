@@ -1,0 +1,50 @@
+CORRECCIÓN — "Enviar liga" se quedaba cargando
+130 pruebas en verde (1 nueva).
+
+============================================================
+QUÉ PASÓ (confirmado en los logs de Railway)
+============================================================
+
+Tus dos intentos quedaron registrados como 499 (el navegador cerró la
+conexión) tras 80 y 52 segundos. El flujo de red muestra la causa:
+la conexión saliente a smtp.gmail.com:465 NUNCA se establece —
+RAILWAY BLOQUEA LOS PUERTOS SMTP SALIENTES (25/465/587) en su plan.
+Y mi diseño, además, esperaba a que el correo saliera antes de
+responderte: con el puerto bloqueado, eso era colgarse ~2 minutos.
+
+============================================================
+QUÉ CORREGÍ (ya en producción)
+============================================================
+
+1. La respuesta ahora es INMEDIATA: al tocar "Enviar liga" ves el
+   aviso al instante y el correo sale en segundo plano.
+2. El envío ya no puede colgarse: timeout de 8-12 segundos; si falla,
+   queda un asiento RESTABLECIMIENTO_ERROR en /admin/bitacora (sin
+   token ni secretos) para que lo veas.
+3. Soporte nuevo para enviar por HTTPS con RESEND (api.resend.com),
+   que Railway SÍ permite (puerto 443). Tiene prioridad sobre SMTP.
+
+============================================================
+LO QUE FALTA DE TU LADO (para que el correo llegue de verdad)
+============================================================
+
+Como Railway bloquea SMTP, Gmail no va a funcionar desde ahí. El
+camino práctico es Resend (gratis hasta 3,000 correos/mes):
+
+1. Crea cuenta en resend.com.
+2. En Resend: Domains → Add Domain → ferez.mx, y agrega en tu DNS los
+   registros que te indique (SPF/DKIM). Verifica.
+3. En Resend: API Keys → crea una clave.
+4. En Railway agrega las variables:
+     RESEND_API_KEY      = (la clave)
+     CORREO_REMITENTE    = Panel Ferez <no-reply@ferez.mx>
+5. Redespliega (o espera el siguiente deploy) y prueba "Olvidé mi
+   contraseña": el aviso sale al instante y la liga llega al correo.
+
+Alternativa si prefieres no usar Resend: pedir a Railway que
+desbloquee SMTP para tu servicio (lo hacen en planes de pago previa
+solicitud) y entonces el camino Gmail/IMPORT_MAIL_* funcionará solo.
+
+Mientras ninguna de las dos cosas exista, el botón responde bien pero
+el correo no sale: lo verás como RESTABLECIMIENTO_ERROR en bitácora.
+Tu UPDATE de emergencia en TiDB sigue siendo válido mientras tanto.

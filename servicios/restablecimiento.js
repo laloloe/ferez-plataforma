@@ -21,6 +21,30 @@ const usuarios = require('./usuarios');
 const MINUTOS_VIGENCIA = 30;
 const LIMITE_SOLICITUDES_HORA = 3;
 
+// Proveedor por API HTTPS (Resend): Railway BLOQUEA los puertos SMTP
+// salientes (25/465/587), así que el correo debe salir por HTTPS (443).
+// RESEND_API_KEY + CORREO_REMITENTE (default no-reply@ferez.mx).
+function proveedorResend() {
+  if (!process.env.RESEND_API_KEY) return null;
+  return {
+    clave: process.env.RESEND_API_KEY,
+    remitente: process.env.CORREO_REMITENTE || 'Panel Ferez <no-reply@ferez.mx>',
+  };
+}
+
+async function enviarResend(destino, asunto, texto) {
+  const resend = proveedorResend();
+  const respuesta = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${resend.clave}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ from: resend.remitente, to: [destino], subject: asunto, text: texto }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!respuesta.ok) {
+    throw new Error(`Resend respondió ${respuesta.status}`);
+  }
+}
+
 function servidorSMTP() {
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
     return {
@@ -43,7 +67,7 @@ function servidorSMTP() {
 }
 
 function configurado() {
-  return Boolean(servidorSMTP());
+  return Boolean(proveedorResend() || servidorSMTP());
 }
 
 function urlSitio() {
@@ -57,14 +81,23 @@ async function enviarSMTP(destino, asunto, texto) {
     host: smtp.host, port: smtp.port, secure: smtp.port === 465,
     auth: { user: smtp.user, pass: smtp.pass },
     logger: false,
+    // Nunca colgarse: si el puerto está bloqueado (Railway), falla rápido.
+    connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 12000,
   });
   await transporte.sendMail({ from: smtp.user, to: destino, subject: asunto, text: texto });
 }
 
+// Resend (HTTPS) tiene prioridad; SMTP queda de respaldo para entornos
+// donde los puertos de correo sí están abiertos.
+async function enviarReal(destino, asunto, texto) {
+  if (proveedorResend()) return enviarResend(destino, asunto, texto);
+  return enviarSMTP(destino, asunto, texto);
+}
+
 // Inyectable en pruebas (y recuperable).
-let enviador = enviarSMTP;
+let enviador = enviarReal;
 function _fijarEnviador(fn) {
-  enviador = fn ?? enviarSMTP;
+  enviador = fn ?? enviarReal;
 }
 
 function hashDeToken(token) {
@@ -81,7 +114,7 @@ async function asentar(resultado, detalle) {
 // Solicitud de liga. SIEMPRE devuelve { ok: true } (respuesta genérica),
 // salvo cuando el servicio está apagado por falta de SMTP.
 async function solicitar({ correo, ip }) {
-  if (!configurado() && enviador === enviarSMTP) {
+  if (!configurado() && enviador === enviarReal) {
     return { ok: false, codigo: 'NO_CONFIGURADO' };
   }
   const correoLimpio = String(correo ?? '').trim().toLowerCase();
@@ -109,13 +142,20 @@ async function solicitar({ correo, ip }) {
     [usuario.id, hashDeToken(token)]);
 
   const liga = `${urlSitio()}/admin/restablecer?token=${token}`;
-  await enviador(usuario.correo, 'Restablecer contraseña — Panel Ferez',
+  try {
+    await enviador(usuario.correo, 'Restablecer contraseña — Panel Ferez',
     `Hola ${usuario.nombre}:\n\n` +
     `Alguien (ojalá tú) pidió restablecer la contraseña de tu usuario del Panel Ferez.\n\n` +
     `Abre esta liga para definir una nueva contraseña (vence en ${MINUTOS_VIGENCIA} minutos y sirve una sola vez):\n\n` +
     `${liga}\n\n` +
     `Si tú no lo pediste, ignora este correo: tu contraseña actual sigue siendo válida.\n\n` +
     `Panel Ferez — ferez.mx`);
+  } catch (err) {
+    // La respuesta al visitante sigue siendo genérica; el fallo queda
+    // visible para el administrador (sin token ni secretos).
+    console.error('restablecimiento: no se pudo enviar el correo:', String(err.message).slice(0, 200));
+    await asentar('RESTABLECIMIENTO_ERROR', `No se pudo enviar el correo a ${usuario.correo}: ${String(err.message).slice(0, 200)}`);
+  }
   return { ok: true };
 }
 
